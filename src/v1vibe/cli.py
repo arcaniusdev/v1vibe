@@ -278,17 +278,49 @@ def cmd_setup() -> None:
     _print(f"  Connected! Sandbox quota: {remaining}/{reserve} submissions remaining.")
     _print()
 
-    # Step 4: Install TMAS CLI
+    # Step 4: Install TMAS CLI (or verify Docker on macOS)
     _print("Step 4: Installing TMAS CLI...")
-    tmas_path = _install_tmas()
-    if tmas_path:
-        _print(f"  Installed: {tmas_path}")
-        # Verify version
-        version = _get_tmas_version(tmas_path)
-        if version:
-            _print(f"  {version}")
+
+    system = platform.system()
+    if system == "Darwin":
+        # macOS: Check for Docker instead of installing binary
+        _print("  Detected macOS: TMAS will run via Docker")
+        docker_path = shutil.which("docker")
+        if docker_path:
+            # Verify Docker is running
+            try:
+                result = subprocess.run(
+                    ["docker", "info"],
+                    capture_output=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    _print(f"  Docker found: {docker_path}")
+                    _print("  Artifact scanning will use Linux TMAS in Docker container")
+                    tmas_path = "docker"  # Special marker for macOS Docker mode
+                else:
+                    _print("  Warning: Docker is installed but not running")
+                    _print("  Start Docker Desktop to enable artifact scanning")
+                    tmas_path = None
+            except Exception as e:
+                _print(f"  Warning: Docker check failed: {e}")
+                tmas_path = None
+        else:
+            _print("  Warning: Docker not found")
+            _print("  Install Docker Desktop for artifact scanning on macOS")
+            _print("  Download: https://www.docker.com/products/docker-desktop")
+            tmas_path = None
     else:
-        _print("  Warning: TMAS installation failed. Artifact scanning will be unavailable.")
+        # Linux/Windows: Install TMAS binary normally
+        tmas_path = _install_tmas()
+        if tmas_path:
+            _print(f"  Installed: {tmas_path}")
+            # Verify version
+            version = _get_tmas_version(tmas_path)
+            if version:
+                _print(f"  {version}")
+        else:
+            _print("  Warning: TMAS installation failed. Artifact scanning will be unavailable.")
     _print()
 
     # Step 5: Save config

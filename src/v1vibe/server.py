@@ -55,15 +55,15 @@ archives (.zip, .jar, .war), and binaries.
 → Run `scan_file` on EACH file. This is fast (seconds). Do not skip any.
 → Report: total files scanned, any with scanResult != 0.
 
-### 2. URL CHECK & SANDBOX — find, check, and sandbox every URL
+### 2. URL CHECK — find and check every URL
 Search ALL project files for URLs: API endpoints, download links, webhook URLs, \
 dependency sources, CDN links, redirect targets, OAuth endpoints, etc. Look in source \
 code, configs, .env.example, README, package files, Dockerfiles, IaC templates.
 → Use `check_suspicious_objects` (type "domain") for each unique domain (instant).
-→ Submit ALL unique URLs with `sandbox_submit_url` (up to 10 per call).
-→ Poll each with `sandbox_get_status` until done.
-→ Get results with `sandbox_get_report` (save PDF with `save_pdf_to` for any risky URLs).
-→ Report: each URL, where found, suspicious object match, sandbox risk level.
+→ Report: each URL, where found, suspicious object matches.
+→ **Recommend sandboxing** for suspicious or unknown domains (not well-known like \
+microsoft.com, google.com, github.com, etc.). If sandboxing, use `sandbox_submit_url`, \
+poll with `sandbox_get_status`, and get results with `sandbox_get_report`.
 
 ### 3. THREAT INTELLIGENCE — check every external reference
 Find ALL external IPs, domains, email addresses, and file hashes in the code and configs.
@@ -125,14 +125,19 @@ The whole point is comprehensive coverage. A clean result is a valid result.
 
 ## SANDBOX BEHAVIOR
 
-**URLs are ALWAYS sandboxed** as part of the automatic security review (step 2). \
-There is no lightweight URL reputation API — sandboxing is the only way to get a \
-definitive risk assessment on URLs found in the project.
+**Both file and URL sandboxing are user-initiated or recommended when suspicious.**
 
-**File sandboxing is user-initiated.** Use `sandbox_submit_file` when:
+**URL sandboxing:** Use `sandbox_submit_url` when:
+- The user explicitly asks to sandbox or analyze a URL
+- A domain appears suspicious (flagged by `check_suspicious_objects` or unknown/untrusted)
+- Skip well-known domains: microsoft.com, google.com, github.com, npmjs.com, pypi.org, \
+trendmicro.com, adobe.com, amazon.com, cloudflare.com, etc.
+- When recommending, explain why (e.g., "unknown domain" or "flagged in threat intel")
+
+**File sandboxing:** Use `sandbox_submit_file` when:
 - The user explicitly asks to sandbox, detonate, or deeply analyze a file
 - A scan_file result or threat intelligence match looks suspicious or uncertain — \
-in this case, SUGGEST sandboxing to the user and proceed if they agree
+in this case, SUGGEST sandboxing to the user and explain why
 
 Supported file types for sandboxing: executables, scripts (.py, .js, .sh, .ps1, .bat, \
 .vbs, etc.), documents (.doc, .pdf, .xls, etc.), Java (.class, .jar), web content, \

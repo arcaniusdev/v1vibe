@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
 import shutil
 import subprocess
 import tempfile
@@ -51,8 +53,10 @@ async def scan_artifact(
             }
         }
 
-    # Find TMAS binary
-    tmas_path = ctx.settings.tmas_binary_path or shutil.which("tmas")
+    # Check TMAS availability
+    tmas_path = ctx.settings.tmas_binary_path
+    use_docker = False
+
     if not tmas_path:
         return {
             "error": {
@@ -61,44 +65,98 @@ async def scan_artifact(
             }
         }
 
-    if not Path(tmas_path).exists():
-        return {
-            "error": {
-                "code": "TmasBinaryNotFound",
-                "message": f"TMAS binary not found at {tmas_path}. Run: v1vibe setup",
+    # Check if we're using Docker mode (macOS)
+    if tmas_path == "docker":
+        use_docker = True
+        # Verify Docker is available
+        if not shutil.which("docker"):
+            return {
+                "error": {
+                    "code": "DockerNotFound",
+                    "message": "Docker not found. Install Docker Desktop for artifact scanning on macOS.",
+                }
             }
-        }
-
-    # Build command
-    cmd = [tmas_path, "scan", artifact]
-
-    # Add scan type flags
-    if "vulnerability" in scan_types:
-        cmd.append("-V")
-    if "malware" in scan_types:
-        cmd.append("-M")
-    if "secrets" in scan_types:
-        cmd.append("-S")
-
-    # Add region if not in additional args
-    if additional_args and "--region" not in additional_args:
-        cmd.extend(["--region", ctx.settings.region])
-    elif not additional_args:
-        cmd.extend(["--region", ctx.settings.region])
+    else:
+        # Using binary directly (Linux/Windows)
+        if not Path(tmas_path).exists():
+            return {
+                "error": {
+                    "code": "TmasBinaryNotFound",
+                    "message": f"TMAS binary not found at {tmas_path}. Run: v1vibe setup",
+                }
+            }
 
     # Create temp directory for output
     with tempfile.TemporaryDirectory() as tmpdir:
         output_file = Path(tmpdir) / "tmas_scan_report.json"
 
-        # Add output format args
-        cmd.extend(["--redacted", f"--output=json={output_file}"])
+        if use_docker:
+            # Docker mode for macOS
+            # Convert artifact path to absolute
+            artifact_abs = str(Path(artifact).resolve())
 
-        # Add any additional arguments
-        if additional_args:
-            cmd.extend(additional_args.split())
+            # Build Docker command
+            cmd = [
+                "docker", "run", "--rm",
+                "-v", f"{artifact_abs}:/scan:ro",  # Mount artifact read-only
+                "-v", f"{tmpdir}:/output",  # Mount output directory
+                "-e", f"TMAS_API_KEY={ctx.settings.api_token}",
+                "-w", "/tmp",
+                "ubuntu:22.04",
+                "sh", "-c",
+            ]
 
-        # Set environment variable for API key
-        env = {"TMAS_API_KEY": ctx.settings.api_token}
+            # Build the shell command to run inside container
+            tmas_flags = []
+            if "vulnerability" in scan_types:
+                tmas_flags.append("-V")
+            if "malware" in scan_types:
+                tmas_flags.append("-M")
+            if "secrets" in scan_types:
+                tmas_flags.append("-S")
+
+            region_flag = f"--region {ctx.settings.region}"
+            if additional_args and "--region" in additional_args:
+                region_flag = ""
+
+            shell_cmd = (
+                f"curl -sL https://ast-cli.xdr.trendmicro.com/tmas-cli/2.221.0/tmas-cli_Linux_$(uname -m).tar.gz | tar xz && "
+                f"./tmas scan /scan {' '.join(tmas_flags)} {region_flag} "
+                f"--redacted --output=json=/output/tmas_scan_report.json"
+            )
+
+            if additional_args:
+                shell_cmd += f" {additional_args}"
+
+            cmd.append(shell_cmd)
+            env = None  # Docker -e flag handles API key
+        else:
+            # Binary mode for Linux/Windows
+            cmd = [tmas_path, "scan", artifact]
+
+            # Add scan type flags
+            if "vulnerability" in scan_types:
+                cmd.append("-V")
+            if "malware" in scan_types:
+                cmd.append("-M")
+            if "secrets" in scan_types:
+                cmd.append("-S")
+
+            # Add region if not in additional args
+            if additional_args and "--region" not in additional_args:
+                cmd.extend(["--region", ctx.settings.region])
+            elif not additional_args:
+                cmd.extend(["--region", ctx.settings.region])
+
+            # Add output format args
+            cmd.extend(["--redacted", f"--output=json={output_file}"])
+
+            # Add any additional arguments
+            if additional_args:
+                cmd.extend(additional_args.split())
+
+            # Set environment variable for API key
+            env = {"TMAS_API_KEY": ctx.settings.api_token}
 
         try:
             # Run TMAS CLI
