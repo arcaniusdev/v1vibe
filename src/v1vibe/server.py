@@ -281,17 +281,17 @@ async def get_submission_quota(ctx: Context) -> dict:
 @mcp.tool()
 async def get_threat_indicators(
     ctx: Context,
-    top: int = 1000,
+    top: int = 200,
     start_date_time: str | None = None,
     end_date_time: str | None = None,
 ) -> dict:
     """Get indicators of compromise (IoCs) from the Trend Micro threat intelligence feed.
 
-    Returns STIX 2.1 indicator objects including file hashes, IP addresses, domains,
-    and URLs associated with known threats. Use to cross-reference against code dependencies.
+    Returns extracted IoCs (file hashes, IPs, domains, URLs, emails) with their STIX
+    patterns and labels. Use to cross-reference against project files and dependencies.
 
     Args:
-        top: Maximum indicators to return (1000, 5000, or 10000).
+        top: Maximum indicators to return (default 200, max 10000).
         start_date_time: ISO 8601 start of time range.
         end_date_time: ISO 8601 end of time range.
     """

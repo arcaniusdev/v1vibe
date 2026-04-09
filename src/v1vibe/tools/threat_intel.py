@@ -52,12 +52,12 @@ async def check_suspicious_objects(
 
 async def get_threat_indicators(
     ctx: AppContext,
-    top: int = 1000,
+    top: int = 200,
     start_date_time: str | None = None,
     end_date_time: str | None = None,
 ) -> dict[str, Any]:
     try:
-        clamped_top = min((v for v in sorted(VALID_INDICATOR_TOPS) if v >= top), default=10000)
+        clamped_top = min((v for v in sorted(VALID_INDICATOR_TOPS) if v >= top), default=1000)
         params: dict[str, Any] = {"top": clamped_top}
         if start_date_time:
             params["startDateTime"] = start_date_time
@@ -68,7 +68,43 @@ async def get_threat_indicators(
             "/v3.0/threatintel/feedIndicators",
             params=params,
         )
-        return check_response(resp)
+        raw = check_response(resp)
+
+        # Extract just the usable IoCs from STIX objects to keep response size manageable.
+        # Raw STIX bundles are too large for MCP tool responses.
+        indicators = []
+        for obj in raw.get("objects", []):
+            if obj.get("type") != "indicator":
+                continue
+            pattern = obj.get("pattern", "")
+            indicator: dict[str, Any] = {
+                "pattern": pattern,
+                "created": obj.get("created", ""),
+                "valid_from": obj.get("valid_from", ""),
+                "labels": obj.get("labels", []),
+            }
+            # Extract the value from STIX pattern for easy matching
+            # e.g., "[file:hashes.'SHA-256' = 'abc123']" -> type=sha256, value=abc123
+            if "file:hashes" in pattern:
+                indicator["ioc_type"] = "file_hash"
+            elif "ipv4-addr:value" in pattern:
+                indicator["ioc_type"] = "ipv4"
+            elif "ipv6-addr:value" in pattern:
+                indicator["ioc_type"] = "ipv6"
+            elif "domain-name:value" in pattern:
+                indicator["ioc_type"] = "domain"
+            elif "url:value" in pattern:
+                indicator["ioc_type"] = "url"
+            elif "email-addr:value" in pattern:
+                indicator["ioc_type"] = "email"
+            else:
+                indicator["ioc_type"] = "other"
+            indicators.append(indicator)
+
+        return {
+            "totalReturned": len(indicators),
+            "indicators": indicators,
+        }
     except Exception as exc:
         return format_error(exc)
 
