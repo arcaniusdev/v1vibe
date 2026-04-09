@@ -19,7 +19,7 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 |------|-------------|
 | `scan_file` | Fast malware scan using File Security SDK (seconds per file) |
 | `sandbox_submit_file` | Deep behavioral analysis of files (executables, scripts, documents) |
-| `sandbox_submit_url` | Sandbox analysis for up to 10 URLs (automatic in security reviews) |
+| `sandbox_submit_url` | Sandbox analysis for up to 10 URLs (user-initiated or recommended for suspicious URLs) |
 | `sandbox_get_status` | Poll sandbox submission status |
 | `sandbox_get_report` | Get full detonation report with risk level, detections, behavioral findings, PDF |
 
@@ -241,7 +241,7 @@ Add the following to your `~/.claude/CLAUDE.md` (global) or project-level `CLAUD
 When the user asks for any security review, check, or scan, complete EVERY step:
 
 1. **MALWARE SCAN** -- `scan_file` on EVERY file in the project. Do not skip any.
-2. **URL CHECK & SANDBOX** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain. `sandbox_submit_url` all URLs (always). Poll and get report.
+2. **URL CHECK** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain. Recommend sandboxing for suspicious or unknown domains (not well-known like microsoft.com, google.com, github.com). If sandboxing, use `sandbox_submit_url`, poll `sandbox_get_status`, get `sandbox_get_report`.
 3. **THREAT INTEL** -- Find ALL external IPs, domains, hashes. `check_suspicious_objects` each.
 4. **IAC SCAN** -- `scan_iac_template` on every CloudFormation/Terraform file. `scan_terraform_archive` for HCL directories.
 5. **ARTIFACT SCAN** -- `scan_artifact` on project directory (ALWAYS run unless pure docs/config). Scans for dependency CVEs, malware in packages, and exposed secrets.

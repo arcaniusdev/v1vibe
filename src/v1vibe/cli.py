@@ -52,7 +52,7 @@ CLAUDE_MD_SNIPPET = """\
 When the user asks for any security review, check, or scan, complete EVERY step:
 
 1. **MALWARE SCAN** -- `scan_file` on EVERY file in the project. Do not skip any.
-2. **URL CHECK & SANDBOX** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain. Then `sandbox_submit_url` ALL URLs (always). Poll and get report.
+2. **URL CHECK** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain. Recommend sandboxing for suspicious or unknown domains (not well-known like microsoft.com, google.com, github.com). If sandboxing, use `sandbox_submit_url`, poll `sandbox_get_status`, get `sandbox_get_report`.
 3. **THREAT INTEL** -- Find ALL external IPs, domains, hashes. `check_suspicious_objects` each.
 4. **IAC SCAN** -- `scan_iac_template` on every CloudFormation/Terraform file. `scan_terraform_archive` for HCL directories.
 5. **ARTIFACT SCAN** -- `scan_artifact` on project directory (ALWAYS run unless pure docs/config). Scans for dependency CVEs, malware in packages, and exposed secrets.
@@ -60,7 +60,7 @@ When the user asks for any security review, check, or scan, complete EVERY step:
 7. **AI GUARD** -- ALWAYS run `ai_guard_evaluate` with project summary. NOT optional.
 8. **REPORT** -- Results from ALL steps: malware, URLs, threat intel, IaC, artifacts, CVEs, AI Guard. Recommend remediation.
 
-**URL sandboxing is always automatic.** **File sandboxing is user-initiated** -- only when asked, or suggest when suspicious.
+**Both URL and file sandboxing are user-initiated or recommended when suspicious.** Recommend URL sandboxing for unknown/untrusted domains. Recommend file sandboxing when scan results are suspicious.
 
 **Do NOT skip steps because they seem unlikely to find something. Clean results are valid results.**
 """
