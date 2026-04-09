@@ -120,8 +120,10 @@ async def scan_artifact(
                 region_flag = ""
 
             shell_cmd = (
-                f"curl -sL https://ast-cli.xdr.trendmicro.com/tmas-cli/2.221.0/tmas-cli_Linux_$(uname -m).tar.gz | tar xz && "
-                f"./tmas scan /scan {' '.join(tmas_flags)} {region_flag} "
+                f"apt-get update -qq && apt-get install -y -qq curl > /dev/null 2>&1 && "
+                f"ARCH=$(uname -m); [ \"$ARCH\" = \"aarch64\" ] && ARCH=\"arm64\" || true; "
+                f"curl -sL https://ast-cli.xdr.trendmicro.com/tmas-cli/2.221.0/tmas-cli_Linux_$ARCH.tar.gz | tar xz && "
+                f"./tmas scan dir:/scan {' '.join(tmas_flags)} {region_flag} "
                 f"--redacted --output=json=/output/tmas_scan_report.json"
             )
 
