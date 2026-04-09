@@ -2,7 +2,7 @@
 
 An MCP server that gives AI coding assistants real-time security validation powered by [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Scan files for malware, detonate suspicious files and URLs in a cloud sandbox, look up threat intelligence, and validate AI-generated content — all from within your AI coding workflow.
 
-## Features (21 tools)
+## Features (19 tools)
 
 ### File & Code Security
 | Tool | What it does |
@@ -33,12 +33,10 @@ An MCP server that gives AI coding assistants real-time security validation powe
 | `list_yara_rules` | List available YARA rule files |
 | `run_yara_rules` | Execute YARA rules on endpoints targeting files or processes |
 
-### Attack Surface & Vulnerabilities
+### Vulnerabilities
 | Tool | What it does |
 |------|-------------|
-| `discover_assets` | Find devices, cloud assets, public IPs, FQDNs, apps, or accounts with risk scores |
 | `get_cve_details` | Get detailed CVE info with CVSS scores, mitigation options, affected counts |
-| `list_vulnerabilities` | List CVEs across devices, internal/internet-facing assets, cloud VMs, serverless |
 | `list_container_vulnerabilities` | List CVEs in container images with package and fix details |
 
 ## Quick Start

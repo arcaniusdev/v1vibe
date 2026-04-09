@@ -5,7 +5,6 @@ from mcp.server.fastmcp import Context, FastMCP
 from v1vibe.clients import AppContext, app_lifespan
 from v1vibe.tools import (
     ai_guard,
-    attack_surface,
     endpoint,
     file_security,
     sandbox,
@@ -42,11 +41,10 @@ Follow up with sandbox_get_status and sandbox_get_report.
 - **start_malware_scan**: Trigger a remote malware scan on managed endpoints.
 - **list_yara_rules / run_yara_rules**: List and execute YARA rules on endpoints.
 
-## Attack Surface & Vulnerabilities
+## Vulnerabilities
 
-- **discover_assets**: Find devices, cloud assets, public IPs, FQDNs, apps, or domain accounts with risk scores.
-- **get_cve_details**: Get detailed CVE info including CVSS, mitigation, and affected asset counts.
-- **list_vulnerabilities**: List CVEs across devices, internal/internet-facing assets, containers, cloud VMs, serverless.
+- **get_cve_details**: Get detailed CVE info including CVSS, mitigation, and affected asset counts. \
+Use when code depends on a library with a known CVE.
 - **list_container_vulnerabilities**: List CVEs in container images with package and fix details.
 
 ## Workflow patterns
@@ -417,31 +415,6 @@ async def run_yara_rules(
     )
 
 
-# --- Attack Surface Discovery ---
-
-
-@mcp.tool()
-async def discover_assets(
-    ctx: Context,
-    asset_type: str,
-    filter_expr: str | None = None,
-    top: int = 50,
-    order_by: str | None = None,
-) -> dict:
-    """Discover assets in the organization's attack surface with risk scores.
-
-    Returns devices, cloud assets, public IPs, FQDNs, local applications,
-    or domain accounts with their risk assessments and metadata.
-
-    Args:
-        asset_type: One of: devices, cloud_assets, public_ips, fqdns, local_apps, domain_accounts.
-        filter_expr: TMV1-Filter expression (e.g., "latestRiskScore gt 50", "osPlatform eq 'Linux'").
-        top: Maximum results (10-1000).
-        order_by: Sort field (e.g., "latestRiskScore desc").
-    """
-    return await attack_surface.discover_assets(_ctx(ctx), asset_type, filter_expr, top, order_by)
-
-
 # --- Vulnerability Management ---
 
 
@@ -454,28 +427,12 @@ async def get_cve_details(
 
     Returns CVSS scores, description, mitigation options (patches, packages),
     and counts of affected assets across devices, containers, cloud VMs, and serverless.
+    Use when code depends on a library with a known CVE.
 
     Args:
         cve_id: The CVE identifier (e.g., "CVE-2023-44487").
     """
     return await vulnerabilities.get_cve_details(_ctx(ctx), cve_id)
-
-
-@mcp.tool()
-async def list_vulnerabilities(
-    ctx: Context,
-    asset_type: str,
-    risk_level: str | None = None,
-    top: int = 50,
-) -> dict:
-    """List highly-exploitable CVEs detected across different asset types.
-
-    Args:
-        asset_type: One of: devices, internal_assets, internet_facing, containers, cloud_vms, serverless.
-        risk_level: Optional filter — one of: high, medium, low.
-        top: Maximum results to return.
-    """
-    return await vulnerabilities.list_vulnerabilities(_ctx(ctx), asset_type, risk_level, top)
 
 
 @mcp.tool()
