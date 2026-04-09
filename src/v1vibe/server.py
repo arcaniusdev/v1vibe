@@ -7,6 +7,7 @@ from v1vibe.tools import (
     ai_guard,
     endpoint,
     file_security,
+    iac_scanner,
     sandbox,
     search,
     threat_intel,
@@ -30,6 +31,7 @@ You MUST use v1vibe tools when the user says ANY of the following (or similar):
 - "check for vulnerabilities", "any CVEs", "vulnerability scan"
 - "threat check", "threat assessment", "look up this hash/IP/domain"
 - "review this code for security", "pentest", "harden this"
+- "scan this template", "check this CloudFormation", "check this Terraform", "IaC scan"
 
 When in doubt, USE v1vibe. It is always better to scan and find nothing than to skip scanning.
 
@@ -50,7 +52,13 @@ results with `sandbox_get_report`.
 For any external IPs, domains, or file hashes referenced in the code, use \
 `check_suspicious_objects` to look them up in threat intelligence.
 
-### Step 4: Check known CVEs
+### Step 4: Scan IaC templates
+If the project contains CloudFormation templates (YAML/JSON) or Terraform configurations, \
+use `scan_iac_template` on each template file. For Terraform HCL projects with multiple .tf \
+files, ZIP them and use `scan_terraform_archive`. Report any FAILURE findings, especially \
+HIGH/VERY_HIGH/EXTREME risk levels.
+
+### Step 5: Check known CVEs
 If the project uses libraries or frameworks with known CVEs, use `get_cve_details` to \
 look up the specific CVE and assess severity. For containerized projects, use \
 `list_container_vulnerabilities` to scan container images.
@@ -90,6 +98,12 @@ remediation steps for any issues.
 - **list_alerts**: List workbench alerts by status/severity.
 - **start_malware_scan**: Trigger remote endpoint malware scan.
 - **list_yara_rules / run_yara_rules**: Manage and execute YARA rules on endpoints.
+
+### Infrastructure as Code Scanning
+- **scan_iac_template**: Scan a CloudFormation (YAML/JSON) or Terraform plan (JSON) template \
+for security misconfigurations, compliance violations, and best practice issues. Use whenever \
+you create or modify IaC templates.
+- **scan_terraform_archive**: Scan a ZIP of Terraform HCL (.tf) files.
 
 ### Vulnerabilities
 - **get_cve_details**: Detailed CVE info with CVSS, mitigation, affected counts.
@@ -458,6 +472,46 @@ async def run_yara_rules(
     )
 
 
+# --- Infrastructure as Code Scanning ---
+
+
+@mcp.tool()
+async def scan_iac_template(
+    ctx: Context,
+    file_path: str,
+    template_type: str,
+) -> dict:
+    """Scan a CloudFormation or Terraform template for security misconfigurations.
+
+    Checks IaC templates against hundreds of security rules covering compliance
+    standards, best practices, and common misconfigurations. Returns findings with
+    risk levels (LOW to EXTREME), affected resources, and remediation links.
+
+    Use this whenever you create or modify CloudFormation or Terraform templates.
+
+    Args:
+        file_path: Absolute path to the template file.
+        template_type: One of: cloudformation-template (YAML/JSON), terraform-template (Terraform plan JSON).
+    """
+    return await iac_scanner.scan_template(_ctx(ctx), file_path, template_type)
+
+
+@mcp.tool()
+async def scan_terraform_archive(
+    ctx: Context,
+    file_path: str,
+) -> dict:
+    """Scan a ZIP archive containing Terraform HCL (.tf) files for security issues.
+
+    Scans Terraform configurations with a single root module inside the ZIP.
+    Returns findings with risk levels, affected resources, and remediation links.
+
+    Args:
+        file_path: Absolute path to the ZIP file containing .tf files.
+    """
+    return await iac_scanner.scan_terraform_archive(_ctx(ctx), file_path)
+
+
 # --- Vulnerability Management ---
 
 
@@ -531,25 +585,33 @@ For any external domains, IP addresses, or file hashes referenced in the code:
 Use `check_suspicious_objects` to look each one up.
 Report any matches with their risk level.
 
-## Step 4: Check for known CVEs in dependencies
+## Step 4: Scan IaC templates
+If the project contains CloudFormation templates (.yaml, .json, .template) or Terraform files
+(.tf, .tf.json), scan them for security misconfigurations:
+- For individual CloudFormation or Terraform plan JSON files: use `scan_iac_template`
+- For Terraform HCL projects with multiple .tf files: ZIP them and use `scan_terraform_archive`
+Report any findings with status FAILURE, especially HIGH/VERY_HIGH/EXTREME risk levels.
+
+## Step 5: Check for known CVEs in dependencies
 Review the project's dependency files (package.json, requirements.txt, pom.xml, go.mod, etc.).
 For any dependencies with known security issues, use `get_cve_details` to look up the CVE.
 For containerized projects, use `list_container_vulnerabilities` to check container images.
 
-## Step 5: Deep sandbox analysis (if needed)
+## Step 6: Deep sandbox analysis (if needed)
 If any files look suspicious (obfuscated code, unusual binaries, macro-enabled documents),
 submit them with `sandbox_submit_file` for full behavioral detonation.
 Poll with `sandbox_get_status` and retrieve with `sandbox_get_report`.
 
-## Step 6: AI content validation
+## Step 7: AI content validation
 If the project contains AI prompts, templates, or generated content,
 use `ai_guard_evaluate` to check for harmful content, PII leakage, or prompt injection.
 
-## Step 7: Report
+## Step 8: Report
 Summarize all findings in a clear report:
 - Files scanned and results
 - URLs checked and any flagged
 - Threat intelligence matches
+- IaC template scan findings (misconfigurations, compliance violations)
 - CVEs found and severity
 - Sandbox detonation results
 - Recommendations for remediation"""
