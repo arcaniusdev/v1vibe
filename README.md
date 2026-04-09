@@ -104,6 +104,8 @@ The setup wizard will:
 1. Prompt for your Vision One API token and region
 2. Test connectivity
 3. **Install TMAS CLI** (Trend Micro Artifact Scanner) for dependency/secret/container scanning
+   - **macOS:** Detects Docker availability and offers automated installation via Homebrew if needed
+   - **Linux/Windows:** Downloads and installs native TMAS binary
 4. Save config to `~/.v1vibe/config.json` (includes TMAS binary path)
 5. Register as an MCP server with Claude Code (if installed)
 6. Add CLAUDE.md instructions so Claude proactively uses v1vibe
@@ -121,6 +123,10 @@ v1vibe status   # show config, connectivity, and quota
 - Python 3.10 or higher
 - One of: `pip`, `uv`, or `pipx` (for installation)
 - Internet connection (for downloading TMAS CLI during setup)
+- **macOS users:** Docker Desktop (for artifact scanning)
+  - TMAS CLI requires a Linux environment and runs in a container on macOS
+  - The setup wizard automatically detects missing Docker and offers to install it via Homebrew
+  - If Homebrew is also missing, setup can install it first (fully automated flow)
 
 **Vision One account:**
 - A [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html) account
