@@ -3,47 +3,59 @@ from __future__ import annotations
 from mcp.server.fastmcp import Context, FastMCP
 
 from v1vibe.clients import AppContext, app_lifespan
-from v1vibe.tools import ai_guard, file_security, sandbox, threat_intel
+from v1vibe.tools import (
+    ai_guard,
+    attack_surface,
+    endpoint,
+    file_security,
+    sandbox,
+    search,
+    threat_intel,
+    vulnerabilities,
+    yara_rules,
+)
 
 SERVER_INSTRUCTIONS = """\
 v1vibe provides security validation tools powered by Trend Micro Vision One.
-Use these tools to validate the security of code, files, and URLs during development.
+Use these tools to validate the security of code, files, URLs, and infrastructure.
 
-## When to use these tools
+## File & Code Security
 
-- **scan_file**: Use WHENEVER you create, modify, or download a file that could contain \
-executable code or be a vector for malware. This includes scripts (Python, JS, shell), \
-compiled binaries, Office documents, PDFs, Java .class/.jar files, and archives. The scan \
-is fast (seconds) and should be your first-line check.
+- **scan_file**: Fast malware scan (seconds). Use for any file you create, modify, or download.
+- **sandbox_submit_file**: Deep behavioral analysis via detonation. Use for suspicious files. \
+Follow up with sandbox_get_status and sandbox_get_report.
+- **sandbox_submit_url**: Submit up to 10 URLs for sandbox analysis.
+- **ai_guard_evaluate**: Check text for harmful content, PII leakage, and prompt injection.
+- **get_submission_quota**: Check daily sandbox quota before batch submissions.
 
-- **sandbox_submit_file**: Use for deeper behavioral analysis when scan_file flags something \
-suspicious, or for file types that benefit from dynamic analysis (executables, scripts with \
-complex logic, documents with macros). This detonates the file in a sandbox and provides a \
-full behavioral report. Follow up with sandbox_get_status and sandbox_get_report.
+## Threat Intelligence
 
-- **sandbox_submit_url**: Use when code references external URLs — dependency sources, API \
-endpoints, download links, webhook targets, or redirect URLs. Submit them to verify they \
-are not malicious, phishing, or hosting malware.
+- **check_suspicious_objects**: Look up URLs, domains, IPs, file hashes, or emails.
+- **add_suspicious_objects / remove_suspicious_objects**: Manage the blocklist.
+- **get_threat_indicators**: Get IoCs (STIX 2.1) from Trend threat feeds.
+- **get_threat_reports**: Get intelligence reports filtered by location/industry.
 
-- **sandbox_get_status / sandbox_get_report**: Use after sandbox submissions to poll for \
-completion and retrieve the full analysis report including risk level and threat details.
+## Detection & Response
 
-- **ai_guard_evaluate**: Use to check AI-generated text for harmful content, sensitive \
-information leakage (PII, credentials, secrets), and prompt injection patterns.
+- **search_detections**: Query detection logs by file hash, process, IP, malware name, etc.
+- **list_alerts**: List workbench alerts filtered by status and severity.
+- **start_malware_scan**: Trigger a remote malware scan on managed endpoints.
+- **list_yara_rules / run_yara_rules**: List and execute YARA rules on endpoints.
 
-- **check_suspicious_objects**: Use to look up specific indicators — file hashes (SHA1/SHA256), \
-URLs, domains, IP addresses, or email addresses — against Trend Micro threat intelligence. \
-Useful when you encounter an unfamiliar external resource in code.
+## Attack Surface & Vulnerabilities
 
-- **get_submission_quota**: Check before doing batch sandbox submissions to ensure you have \
-enough quota remaining for the day.
+- **discover_assets**: Find devices, cloud assets, public IPs, FQDNs, apps, or domain accounts with risk scores.
+- **get_cve_details**: Get detailed CVE info including CVSS, mitigation, and affected asset counts.
+- **list_vulnerabilities**: List CVEs across devices, internal/internet-facing assets, containers, cloud VMs, serverless.
+- **list_container_vulnerabilities**: List CVEs in container images with package and fix details.
 
 ## Workflow patterns
 
 1. **Quick validation**: scan_file → done (if clean)
 2. **Deep analysis**: scan_file → sandbox_submit_file → sandbox_get_status (poll) → sandbox_get_report
 3. **URL check**: sandbox_submit_url → sandbox_get_status (poll) → sandbox_get_report
-4. **Threat intel lookup**: check_suspicious_objects (for known indicators)
+4. **Threat intel**: check_suspicious_objects or get_threat_indicators
+5. **Vuln check**: get_cve_details or list_vulnerabilities
 """
 
 mcp = FastMCP("v1vibe", instructions=SERVER_INSTRUCTIONS, lifespan=app_lifespan)
@@ -195,6 +207,295 @@ async def get_submission_quota(ctx: Context) -> dict:
     of file vs URL submission counts. Use before batch submissions.
     """
     return await sandbox.get_submission_quota(_ctx(ctx))
+
+
+# --- Threat Intelligence (write + feeds) ---
+
+
+@mcp.tool()
+async def add_suspicious_objects(
+    ctx: Context,
+    objects: list[dict],
+) -> dict:
+    """Add indicators (URLs, domains, IPs, file hashes, emails) to the Vision One suspicious object blocklist.
+
+    Each object dict must include a type-specific key (e.g., {"url": "http://evil.com"})
+    and can optionally include: description, scanAction (block/log), riskLevel (high/medium/low),
+    daysToExpiration (1-365, or -1 for no expiration, default 30).
+
+    Args:
+        objects: List of objects to add. Each must have one of: url, domain, ip, fileSha1, fileSha256, senderMailAddress.
+    """
+    return await threat_intel.add_suspicious_objects(_ctx(ctx), objects)
+
+
+@mcp.tool()
+async def remove_suspicious_objects(
+    ctx: Context,
+    objects: list[dict],
+) -> dict:
+    """Remove indicators from the Vision One suspicious object blocklist.
+
+    Each object dict needs only the type-specific key (e.g., {"url": "http://evil.com"}).
+
+    Args:
+        objects: List of objects to remove. Each must have one of: url, domain, ip, fileSha1, fileSha256, senderMailAddress.
+    """
+    return await threat_intel.remove_suspicious_objects(_ctx(ctx), objects)
+
+
+@mcp.tool()
+async def get_threat_indicators(
+    ctx: Context,
+    top: int = 1000,
+    start_date_time: str | None = None,
+    end_date_time: str | None = None,
+) -> dict:
+    """Get indicators of compromise (IoCs) from the Trend Micro threat intelligence feed.
+
+    Returns STIX 2.1 indicator objects including file hashes, IP addresses, domains,
+    and URLs associated with known threats. Use to cross-reference against code dependencies.
+
+    Args:
+        top: Maximum indicators to return (1000, 5000, or 10000).
+        start_date_time: ISO 8601 start of time range.
+        end_date_time: ISO 8601 end of time range.
+    """
+    return await threat_intel.get_threat_indicators(_ctx(ctx), top, start_date_time, end_date_time)
+
+
+@mcp.tool()
+async def get_threat_reports(
+    ctx: Context,
+    top_report: int = 10,
+    location: str | None = None,
+    industry: str | None = None,
+    start_date_time: str | None = None,
+    end_date_time: str | None = None,
+) -> dict:
+    """Get threat intelligence reports with related STIX objects (campaigns, malware, CVEs).
+
+    Returns detailed threat reports filtered by geography and industry. Useful for
+    understanding the current threat landscape relevant to your deployment.
+
+    Args:
+        top_report: Maximum reports to return (5, 10, or 20).
+        location: Filter by geography (e.g., "United States of America", "Canada").
+        industry: Filter by industry (e.g., "Technology", "Finance", "Health").
+        start_date_time: ISO 8601 start of time range.
+        end_date_time: ISO 8601 end of time range.
+    """
+    return await threat_intel.get_threat_reports(
+        _ctx(ctx), top_report, location, industry, start_date_time, end_date_time
+    )
+
+
+# --- Detection & Alert Search ---
+
+
+@mcp.tool()
+async def search_detections(
+    ctx: Context,
+    query: str,
+    start_date_time: str | None = None,
+    end_date_time: str | None = None,
+    top: int = 50,
+    fields: list[str] | None = None,
+) -> dict:
+    """Search Vision One detection logs using query syntax.
+
+    Query supports fields like: fileName, fileHash, fileHashSha256, processCmd,
+    src, dst, malName, eventName, suser, duser, and 40+ more.
+    Operators: ':' (equals), 'and', 'or', 'not', 'contains'.
+
+    Args:
+        query: Detection query (e.g., "malName:Ransom* and dst:10.0.0.0/8").
+        start_date_time: ISO 8601 start of time range.
+        end_date_time: ISO 8601 end of time range.
+        top: Maximum results (up to 10000).
+        fields: Optional list of fields to include in results.
+    """
+    return await search.search_detections(
+        _ctx(ctx), query, start_date_time, end_date_time, top, fields
+    )
+
+
+@mcp.tool()
+async def list_alerts(
+    ctx: Context,
+    status: str | None = None,
+    severity: str | None = None,
+    start_date_time: str | None = None,
+    end_date_time: str | None = None,
+    top: int = 50,
+) -> dict:
+    """List workbench alerts from Vision One with filtering.
+
+    Returns alerts with matched detection rules, indicators, and impact scope
+    including affected endpoints, accounts, and containers.
+
+    Args:
+        status: Filter by status — one of: Open, In Progress, Closed.
+        severity: Filter by severity — one of: critical, high, medium, low.
+        start_date_time: ISO 8601 start of time range.
+        end_date_time: ISO 8601 end of time range.
+        top: Maximum alerts to return.
+    """
+    return await search.list_alerts(
+        _ctx(ctx), status, severity, start_date_time, end_date_time, top
+    )
+
+
+# --- Endpoint Actions ---
+
+
+@mcp.tool()
+async def start_malware_scan(
+    ctx: Context,
+    endpoints: list[dict],
+) -> dict:
+    """Trigger a malware scan on one or more managed endpoints.
+
+    Each endpoint dict must have either 'agent_guid' (UUID of the installed agent)
+    or 'endpoint_name' (computer name), and optionally 'description'.
+
+    Args:
+        endpoints: List of endpoints to scan (e.g., [{"endpoint_name": "WORKSTATION-01"}]).
+    """
+    return await endpoint.start_malware_scan(_ctx(ctx), endpoints)
+
+
+# --- YARA Rules ---
+
+
+@mcp.tool()
+async def list_yara_rules(
+    ctx: Context,
+    name_filter: str | None = None,
+    top: int = 50,
+) -> dict:
+    """List available YARA rule files in Vision One.
+
+    Args:
+        name_filter: Filter by exact rule file name.
+        top: Maximum results to return.
+    """
+    return await yara_rules.list_yara_rules(_ctx(ctx), name_filter, top)
+
+
+@mcp.tool()
+async def run_yara_rules(
+    ctx: Context,
+    endpoint_name: str | None = None,
+    agent_guid: str | None = None,
+    rule_content: str | None = None,
+    rule_file_id: str | None = None,
+    rule_file_name: str | None = None,
+    target_file_path: str | None = None,
+    target_process_name: str | None = None,
+    description: str | None = None,
+) -> dict:
+    """Run a YARA rule on an endpoint, targeting a specific file or process.
+
+    Provide the YARA rule as raw content, a file ID, or file name.
+    Target either a file path or process name on the endpoint.
+
+    Args:
+        endpoint_name: Computer name of the target endpoint.
+        agent_guid: UUID of the agent on the target endpoint (alternative to endpoint_name).
+        rule_content: Raw YARA rule content (max 2048 chars).
+        rule_file_id: ID of an existing YARA rule file in Vision One.
+        rule_file_name: Name of an existing YARA rule file in Vision One.
+        target_file_path: File path to scan on the endpoint (e.g., "C:\\Windows\\System32\\calc.exe").
+        target_process_name: Process name to scan on the endpoint.
+        description: Optional description for this task.
+    """
+    return await yara_rules.run_yara_rules(
+        _ctx(ctx), endpoint_name, agent_guid,
+        rule_content, rule_file_id, rule_file_name,
+        target_file_path, target_process_name, description,
+    )
+
+
+# --- Attack Surface Discovery ---
+
+
+@mcp.tool()
+async def discover_assets(
+    ctx: Context,
+    asset_type: str,
+    filter_expr: str | None = None,
+    top: int = 50,
+    order_by: str | None = None,
+) -> dict:
+    """Discover assets in the organization's attack surface with risk scores.
+
+    Returns devices, cloud assets, public IPs, FQDNs, local applications,
+    or domain accounts with their risk assessments and metadata.
+
+    Args:
+        asset_type: One of: devices, cloud_assets, public_ips, fqdns, local_apps, domain_accounts.
+        filter_expr: TMV1-Filter expression (e.g., "latestRiskScore gt 50", "osPlatform eq 'Linux'").
+        top: Maximum results (10-1000).
+        order_by: Sort field (e.g., "latestRiskScore desc").
+    """
+    return await attack_surface.discover_assets(_ctx(ctx), asset_type, filter_expr, top, order_by)
+
+
+# --- Vulnerability Management ---
+
+
+@mcp.tool()
+async def get_cve_details(
+    ctx: Context,
+    cve_id: str,
+) -> dict:
+    """Get detailed information about a specific CVE from Vision One.
+
+    Returns CVSS scores, description, mitigation options (patches, packages),
+    and counts of affected assets across devices, containers, cloud VMs, and serverless.
+
+    Args:
+        cve_id: The CVE identifier (e.g., "CVE-2023-44487").
+    """
+    return await vulnerabilities.get_cve_details(_ctx(ctx), cve_id)
+
+
+@mcp.tool()
+async def list_vulnerabilities(
+    ctx: Context,
+    asset_type: str,
+    risk_level: str | None = None,
+    top: int = 50,
+) -> dict:
+    """List highly-exploitable CVEs detected across different asset types.
+
+    Args:
+        asset_type: One of: devices, internal_assets, internet_facing, containers, cloud_vms, serverless.
+        risk_level: Optional filter — one of: high, medium, low.
+        top: Maximum results to return.
+    """
+    return await vulnerabilities.list_vulnerabilities(_ctx(ctx), asset_type, risk_level, top)
+
+
+@mcp.tool()
+async def list_container_vulnerabilities(
+    ctx: Context,
+    cluster_type: str | None = None,
+    risk_level: str | None = None,
+    top: int = 50,
+) -> dict:
+    """List CVEs found in container images across Kubernetes and ECS clusters.
+
+    Returns vulnerability details including affected packages, CVSS scores,
+    fix versions, and image/registry information.
+
+    Args:
+        cluster_type: Filter by cluster type — one of: kubernetes, amazonEcs.
+        risk_level: Filter by risk level — one of: high, medium, low.
+        top: Maximum results to return.
+    """
+    return await vulnerabilities.list_container_vulnerabilities(_ctx(ctx), cluster_type, risk_level, top)
 
 
 if __name__ == "__main__":

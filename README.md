@@ -2,8 +2,9 @@
 
 An MCP server that gives AI coding assistants real-time security validation powered by [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Scan files for malware, detonate suspicious files and URLs in a cloud sandbox, look up threat intelligence, and validate AI-generated content — all from within your AI coding workflow.
 
-## Features
+## Features (21 tools)
 
+### File & Code Security
 | Tool | What it does |
 |------|-------------|
 | `scan_file` | Fast malware scan via Vision One File Security SDK (seconds) |
@@ -12,8 +13,33 @@ An MCP server that gives AI coding assistants real-time security validation powe
 | `sandbox_get_status` | Poll sandbox submission status |
 | `sandbox_get_report` | Get full analysis report with risk level, detections, and suspicious objects |
 | `ai_guard_evaluate` | Check text for harmful content, PII leakage, and prompt injection |
-| `check_suspicious_objects` | Look up URLs, domains, IPs, or file hashes in threat intelligence |
 | `get_submission_quota` | Check remaining daily sandbox submission quota |
+
+### Threat Intelligence
+| Tool | What it does |
+|------|-------------|
+| `check_suspicious_objects` | Look up URLs, domains, IPs, or file hashes in threat intelligence |
+| `add_suspicious_objects` | Add indicators to the suspicious object blocklist |
+| `remove_suspicious_objects` | Remove indicators from the blocklist |
+| `get_threat_indicators` | Get IoCs (STIX 2.1) from Trend threat intelligence feeds |
+| `get_threat_reports` | Get intelligence reports filtered by location and industry |
+
+### Detection & Response
+| Tool | What it does |
+|------|-------------|
+| `search_detections` | Query detection logs by file hash, process, IP, malware name, etc. |
+| `list_alerts` | List workbench alerts filtered by status and severity |
+| `start_malware_scan` | Trigger a remote malware scan on managed endpoints |
+| `list_yara_rules` | List available YARA rule files |
+| `run_yara_rules` | Execute YARA rules on endpoints targeting files or processes |
+
+### Attack Surface & Vulnerabilities
+| Tool | What it does |
+|------|-------------|
+| `discover_assets` | Find devices, cloud assets, public IPs, FQDNs, apps, or accounts with risk scores |
+| `get_cve_details` | Get detailed CVE info with CVSS scores, mitigation options, affected counts |
+| `list_vulnerabilities` | List CVEs across devices, internal/internet-facing assets, cloud VMs, serverless |
+| `list_container_vulnerabilities` | List CVEs in container images with package and fix details |
 
 ## Quick Start
 
