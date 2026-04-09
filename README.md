@@ -2,7 +2,7 @@
 
 An MCP server that gives AI coding assistants real-time security validation powered by [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Scan files for malware, detonate suspicious files and URLs in a cloud sandbox, look up threat intelligence, and validate AI-generated content — all from within your AI coding workflow.
 
-## Features (12 tools)
+## Features (11 tools)
 
 ### File & Code Security
 | Tool | What it does |
@@ -19,7 +19,6 @@ An MCP server that gives AI coding assistants real-time security validation powe
 | Tool | What it does |
 |------|-------------|
 | `check_suspicious_objects` | Look up URLs, domains, IPs, or file hashes in threat intelligence |
-| `get_threat_indicators` | Pull IoC feed (STIX 2.1) to cross-reference against project files |
 
 ### Infrastructure as Code Scanning
 | Tool | What it does |
@@ -150,7 +149,7 @@ When the user asks for any security review, check, or scan, complete EVERY step:
 
 1. **MALWARE SCAN** -- `scan_file` on EVERY file in the project. Do not skip any.
 2. **URL CHECK** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain. `sandbox_submit_url` all URLs. Poll and get report.
-3. **THREAT INTEL** -- Find ALL external IPs, domains, hashes. `check_suspicious_objects` each. `get_threat_indicators` to cross-reference IoC feed.
+3. **THREAT INTEL** -- Find ALL external IPs, domains, hashes. `check_suspicious_objects` each.
 4. **IAC SCAN** -- `scan_iac_template` on every CloudFormation/Terraform file. `scan_terraform_archive` for HCL directories.
 5. **CVE CHECK** -- Find dependency files. `get_cve_details` for known CVEs. `get_cve_details` for CVEs in base images.
 6. **SANDBOX** -- `sandbox_submit_file` for executables, scripts, JARs, macro docs. Poll and get report.

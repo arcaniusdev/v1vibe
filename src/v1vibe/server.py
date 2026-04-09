@@ -51,17 +51,19 @@ archives (.zip, .jar, .war), and binaries.
 → Run `scan_file` on EACH file. This is fast (seconds). Do not skip any.
 → Report: total files scanned, any with scanResult != 0.
 
-### 2. URL CHECK — find and check every URL against threat intelligence
+### 2. URL CHECK & SANDBOX — find, check, and sandbox every URL
 Search ALL project files for URLs: API endpoints, download links, webhook URLs, \
 dependency sources, CDN links, redirect targets, OAuth endpoints, etc. Look in source \
 code, configs, .env.example, README, package files, Dockerfiles, IaC templates.
 → Use `check_suspicious_objects` (type "domain") for each unique domain (instant).
-→ Report: each URL, where found, any threat intelligence matches.
+→ Submit ALL unique URLs with `sandbox_submit_url` (up to 10 per call).
+→ Poll each with `sandbox_get_status` until done.
+→ Get results with `sandbox_get_report` (save PDF with `save_pdf_to` for any risky URLs).
+→ Report: each URL, where found, suspicious object match, sandbox risk level.
 
 ### 3. THREAT INTELLIGENCE — check every external reference
 Find ALL external IPs, domains, email addresses, and file hashes in the code and configs.
 → Run `check_suspicious_objects` for each one.
-→ Run `get_threat_indicators` to pull the IoC feed and cross-reference against project artifacts.
 → Report: any matches with risk level and recommended action.
 
 ### 4. IAC TEMPLATE SCAN — scan every infrastructure template
@@ -88,22 +90,24 @@ Also check any AI prompts, prompt templates, or system instructions found in the
 ### 7. REPORT — summarize ALL findings
 After completing ALL steps above, produce a structured report:
 - Total files scanned and malware detections
-- URLs checked and threat intelligence matches
-- IoC feed cross-reference results
+- URLs checked: suspicious object matches and sandbox risk levels
+- Threat intelligence matches for IPs, domains, hashes
 - IaC template misconfigurations
 - CVEs found with severity
-- AI content validation results
+- AI Guard results (Allow/Block, categories, PII, prompt injection)
 - Prioritized remediation recommendations
 
 ## IMPORTANT: Do not skip steps because they seem unlikely to find anything. \
 The whole point is comprehensive coverage. A clean result is a valid result.
 
-## SANDBOX DETONATION — user-initiated, not automatic
+## SANDBOX BEHAVIOR
 
-The sandbox tools (`sandbox_submit_file`, `sandbox_submit_url`, `sandbox_get_status`, \
-`sandbox_get_report`) are NOT part of the automatic security review checklist. \
-Use them when:
-- The user explicitly asks to sandbox, detonate, or deeply analyze a file or URL
+**URLs are ALWAYS sandboxed** as part of the automatic security review (step 2). \
+There is no lightweight URL reputation API — sandboxing is the only way to get a \
+definitive risk assessment on URLs found in the project.
+
+**File sandboxing is user-initiated.** Use `sandbox_submit_file` when:
+- The user explicitly asks to sandbox, detonate, or deeply analyze a file
 - A scan_file result or threat intelligence match looks suspicious or uncertain — \
 in this case, SUGGEST sandboxing to the user and proceed if they agree
 
@@ -286,29 +290,6 @@ async def get_submission_quota(ctx: Context) -> dict:
     return await sandbox.get_submission_quota(_ctx(ctx))
 
 
-# --- Threat Intelligence ---
-
-
-@mcp.tool()
-async def get_threat_indicators(
-    ctx: Context,
-    top: int = 200,
-    start_date_time: str | None = None,
-    end_date_time: str | None = None,
-) -> dict:
-    """Get indicators of compromise (IoCs) from the Trend Micro threat intelligence feed.
-
-    Returns extracted IoCs (file hashes, IPs, domains, URLs, emails) with their STIX
-    patterns and labels. Use to cross-reference against project files and dependencies.
-
-    Args:
-        top: Maximum indicators to return (default 200, max 10000).
-        start_date_time: ISO 8601 start of time range.
-        end_date_time: ISO 8601 end of time range.
-    """
-    return await threat_intel.get_threat_indicators(_ctx(ctx), top, start_date_time, end_date_time)
-
-
 # --- Infrastructure as Code Scanning ---
 
 
@@ -392,17 +373,17 @@ report it and move to the next step.
 Find ALL files in the project. Use `scan_file` on EACH one. Do not skip any.
 → Report: total files scanned, any with scanResult != 0.
 
-## Step 2: URL EXTRACTION & SANDBOX — find and check every URL
+## Step 2: URL CHECK & SANDBOX — find, check, and sandbox every URL
 Search ALL project files for URLs (API endpoints, download links, webhooks, CDN, OAuth, etc.).
-→ Use `check_suspicious_objects` (type "domain") for each unique domain.
-→ Submit all unique URLs with `sandbox_submit_url` (up to 10 per call).
-→ Poll with `sandbox_get_status`, get results with `sandbox_get_report`.
-→ Report: each URL, where found, risk level.
+→ Use `check_suspicious_objects` (type "domain") for each unique domain (instant).
+→ Submit ALL unique URLs with `sandbox_submit_url` (up to 10 per call).
+→ Poll each with `sandbox_get_status` until done.
+→ Get results with `sandbox_get_report` (save PDF with `save_pdf_to` for risky URLs).
+→ Report: each URL, where found, suspicious object match, sandbox risk level.
 
 ## Step 3: THREAT INTELLIGENCE — check every external reference
 Find ALL external IPs, domains, email addresses, and file hashes in code and configs.
 → Run `check_suspicious_objects` for each.
-→ Run `get_threat_indicators` and cross-reference IoCs against project artifacts.
 → Report: any matches with risk level.
 
 ## Step 4: IAC TEMPLATE SCAN — scan every infrastructure template
