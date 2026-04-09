@@ -111,6 +111,15 @@ in this case, SUGGEST sandboxing to the user and proceed if they agree
 Supported file types for sandboxing: executables, scripts (.py, .js, .sh, .ps1, .bat, \
 .vbs, etc.), documents (.doc, .pdf, .xls, etc.), Java (.class, .jar), web content, \
 archives, and email. The tool validates extensions and rejects unsupported types.
+
+### When sandbox results come back, you MUST:
+1. Call `sandbox_get_report` with `save_pdf_to` set to a path in the project \
+(e.g., `./reports/sandbox-<filename>.pdf`) so the user has the native PDF report.
+2. Fully analyze ALL fields in the JSON response: risk level, detection names, \
+threat types, true file type, and every suspicious object found.
+3. Discuss the behavioral findings in detail with the user — what the file did \
+during detonation, what network connections it made, what it dropped or modified.
+4. Provide clear recommendations based on the findings.
 """
 
 mcp = FastMCP("v1vibe", instructions=SERVER_INSTRUCTIONS, lifespan=app_lifespan)
@@ -209,16 +218,22 @@ async def sandbox_get_status(
 async def sandbox_get_report(
     ctx: Context,
     result_id: str,
+    save_pdf_to: str | None = None,
 ) -> dict:
     """Get the full analysis report for a completed sandbox submission.
 
     Returns risk level, detection names, threat types, true file type,
     and any suspicious objects (IPs, URLs, domains, file hashes) found.
+    You MUST fully analyze and discuss all findings in the report with the user.
+
+    Also downloads the native PDF report for human review when save_pdf_to is provided.
+    You SHOULD always provide save_pdf_to so the user has a copy of the full report.
 
     Args:
         result_id: The result ID from the resourceLocation in sandbox_get_status.
+        save_pdf_to: Absolute path to save the PDF report (e.g., ./reports/sandbox-report.pdf). Recommended.
     """
-    return await sandbox.get_report(_ctx(ctx), result_id)
+    return await sandbox.get_report(_ctx(ctx), result_id, save_pdf_to)
 
 
 @mcp.tool()

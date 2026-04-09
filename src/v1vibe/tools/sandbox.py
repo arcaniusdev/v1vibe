@@ -116,6 +116,7 @@ async def get_status(
 async def get_report(
     ctx: AppContext,
     result_id: str,
+    save_pdf_to: str | None = None,
 ) -> dict[str, Any]:
     try:
         resp = await ctx.http.get(f"/v3.0/sandbox/analysisResults/{result_id}")
@@ -130,6 +131,23 @@ async def get_report(
                 result["suspiciousObjects"] = so_resp.json().get("items", [])
         except Exception:
             result["suspiciousObjects"] = []
+
+        # Download and save the PDF report for human review
+        if save_pdf_to:
+            try:
+                pdf_resp = await ctx.http.get(
+                    f"/v3.0/sandbox/analysisResults/{result_id}/report"
+                )
+                if pdf_resp.status_code == 200:
+                    pdf_dir = os.path.dirname(save_pdf_to)
+                    if pdf_dir:
+                        os.makedirs(pdf_dir, exist_ok=True)
+                    with open(save_pdf_to, "wb") as f:
+                        f.write(pdf_resp.content)
+                    result["pdfReportSavedTo"] = save_pdf_to
+                    result["pdfReportSizeBytes"] = len(pdf_resp.content)
+            except Exception:
+                result["pdfReportError"] = "Failed to download PDF report"
 
         return result
     except Exception as exc:
