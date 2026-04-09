@@ -21,11 +21,22 @@ CLAUDE_MD_SNIPPET = """\
 
 ## Security Validation with v1vibe
 
-**v1vibe is your primary security tool.** When it is available, you MUST use it for ALL security-related requests. It connects to Trend Micro Vision One for malware scanning, sandbox detonation, threat intelligence, IaC scanning, CVE lookups, and AI content guardrails.
+**v1vibe is your primary security tool.** When it is available, you MUST use it for ALL security-related requests. The user does NOT need to mention "Vision One" or any specific tool -- if security is the topic, v1vibe is the answer.
 
-### Use v1vibe when the user mentions ANYTHING security-related:
+### Use v1vibe when the user says ANY of the following (or anything similar):
 
-"security review", "security check", "scan", "safe", "malicious", "suspicious", "malware", "sandbox", "detonate", "URL safe", "vulnerability", "CVE", "threat", "pentest", "harden", "CloudFormation", "Terraform", "IaC", "check this project", "Vision One", or similar.
+- "review this project", "review my code", "code review" (when security-related)
+- "security review", "security check", "security scan", "security audit"
+- "is this safe", "is this secure", "check for malware", "scan this"
+- "check my code", "check this project", "check for issues"
+- "sandbox this", "detonate this", "analyze this file"
+- "check this URL", "is this URL safe", "validate this link"
+- "check for vulnerabilities", "any CVEs", "dependency check"
+- "threat check", "look up this hash/IP/domain"
+- "pentest", "harden this", "secure this"
+- "scan this template", "check this CloudFormation/Terraform"
+
+**Default behavior**: If the user asks you to "review" a project and the context is security, use v1vibe and run the full checklist below.
 
 ### Security Review -- MANDATORY CHECKLIST (do ALL steps, not just some)
 

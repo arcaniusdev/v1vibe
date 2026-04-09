@@ -1,0 +1,121 @@
+# Vision One Sandbox Supported File Extensions
+# One extension per line (with leading dot). Lines starting with # are comments.
+# Update this file to add/remove supported file types without changing code.
+#
+# Source: Trend Micro Vision One documentation + confirmed support (2026)
+
+# Executables & libraries
+.exe
+.dll
+.com
+.cpl
+.crt
+.scr
+.sys
+.ocx
+.drv
+.msi
+.o
+
+# Scripts
+.bat
+.cmd
+.js
+.jse
+.vbs
+.vbe
+.wsf
+.ps1
+.hta
+.sh
+.py
+
+# Documents
+.doc
+.dot
+.docx
+.dotx
+.docm
+.dotm
+.xls
+.xla
+.xlt
+.xlm
+.xlsx
+.xlsb
+.xltx
+.xlsm
+.xlam
+.xltm
+.ppt
+.pps
+.pptx
+.ppsx
+.potm
+.ppam
+.ppsm
+.pptm
+.pdf
+.rtf
+.pub
+.csv
+.slk
+.iqy
+.xml
+.odt
+.ods
+.odp
+
+# Web content
+.htm
+.html
+.xht
+.xhtml
+.mht
+.mhtml
+.svg
+.swf
+
+# Java
+.class
+.cla
+.jar
+
+# Shortcuts & links
+.lnk
+.url
+
+# Other
+.chm
+.cell
+.mov
+
+# macOS
+.dmg
+.pkg
+
+# Email
+.eml
+.email
+.msg
+
+# Archives (sandbox extracts and analyzes contents)
+.7z
+.ace
+.alz
+.arj
+.hqx
+.bz2
+.bzip2
+.egg
+.gzip
+.gz
+.lha
+.lharc
+.rar
+.tar
+.tgz
+.tnef
+.uue
+.xz
+.zip

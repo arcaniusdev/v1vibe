@@ -2,43 +2,30 @@ from __future__ import annotations
 
 import base64
 import os
+from pathlib import Path
 from typing import Any
 
 from v1vibe.clients import AppContext
 from v1vibe.utils import check_multi_status, check_response, format_error
 
-# File extensions supported by Vision One sandbox for detonation.
-# Source: Trend Micro docs + confirmed Python support (2026).
-SANDBOX_SUPPORTED_EXTENSIONS: set[str] = {
-    # Executables & libraries
-    ".exe", ".dll", ".com", ".cpl", ".crt", ".scr", ".sys", ".ocx", ".drv",
-    ".msi", ".o",
-    # Scripts
-    ".bat", ".cmd", ".js", ".jse", ".vbs", ".vbe", ".wsf", ".ps1", ".hta",
-    ".sh", ".py",
-    # Documents
-    ".doc", ".dot", ".docx", ".dotx", ".docm", ".dotm",
-    ".xls", ".xla", ".xlt", ".xlm", ".xlsx", ".xlsb", ".xltx", ".xlsm", ".xlam", ".xltm",
-    ".ppt", ".pps", ".pptx", ".ppsx", ".potm", ".ppam", ".ppsm", ".pptm",
-    ".pdf", ".rtf", ".pub", ".csv", ".slk", ".iqy", ".xml",
-    ".odt", ".ods", ".odp",
-    # Web content
-    ".htm", ".html", ".xht", ".xhtml", ".mht", ".mhtml", ".svg", ".swf",
-    # Java
-    ".class", ".cla", ".jar",
-    # Shortcuts & links
-    ".lnk", ".url",
-    # Other
-    ".chm", ".cell", ".mov",
-    # macOS
-    ".dmg", ".pkg",
-    # Email
-    ".eml", ".email", ".msg",
-    # Archives (sandbox extracts and analyzes contents)
-    ".7z", ".ace", ".alz", ".arj", ".hqx", ".bz2", ".bzip2", ".egg",
-    ".gzip", ".gz", ".lha", ".lharc", ".rar", ".tar", ".tgz",
-    ".tnef", ".uue", ".xz", ".zip",
-}
+# Load sandbox-supported file extensions from external file.
+# Users can edit sandbox_filetypes.txt to add/remove supported types.
+_FILETYPES_PATH = Path(__file__).resolve().parent.parent / "sandbox_filetypes.txt"
+
+
+def _load_sandbox_extensions() -> set[str]:
+    try:
+        lines = _FILETYPES_PATH.read_text().splitlines()
+        return {
+            line.strip().lower()
+            for line in lines
+            if line.strip() and not line.strip().startswith("#")
+        }
+    except OSError:
+        return set()
+
+
+SANDBOX_SUPPORTED_EXTENSIONS: set[str] = _load_sandbox_extensions()
 
 
 def is_sandbox_supported(file_path: str) -> bool:

@@ -13,16 +13,29 @@ from v1vibe.tools import (
 )
 
 SERVER_INSTRUCTIONS = """\
-v1vibe validates the security of code, files, and infrastructure using Trend Micro Vision One.
+v1vibe is the security validation tool for this environment. ANY time the user wants \
+to validate, review, check, or assess the security of code, files, a project, or \
+infrastructure, you MUST use v1vibe. The user does NOT need to mention "Vision One" \
+or any specific tool — if security is the topic, v1vibe is the answer.
 
 ## WHEN TO USE v1vibe
 
-You MUST use v1vibe when the user mentions ANYTHING security-related:
-"security review", "security check", "scan", "safe", "malicious", "suspicious", \
-"malware", "sandbox", "detonate", "URL safe", "vulnerability", "CVE", "threat", \
-"pentest", "harden", "CloudFormation", "Terraform", "IaC", "check this project", \
-"Vision One", or similar.
+Use v1vibe when the user says ANY of the following (or anything similar):
+- "review", "review this project", "review my code", "code review" (when security-related)
+- "security review", "security check", "security scan", "security audit", "security assessment"
+- "is this safe", "is this secure", "is this malicious", "is this suspicious"
+- "check for malware", "scan for threats", "scan this", "scan this project"
+- "check my code", "check this project", "check for issues", "check for problems"
+- "sandbox this", "detonate this", "analyze this file"
+- "check this URL", "is this URL safe", "validate this link"
+- "check for vulnerabilities", "any CVEs", "vulnerability scan", "dependency check"
+- "threat check", "threat assessment", "look up this hash/IP/domain"
+- "pentest", "harden this", "secure this"
+- "scan this template", "check this CloudFormation", "check this Terraform", "IaC scan"
+- "Vision One", "v1vibe"
 
+**Default behavior**: When the user asks you to "review" a project and the context is \
+security (not just code style or functionality), use v1vibe and run the full checklist. \
 When in doubt, USE v1vibe. Scanning and finding nothing is always better than skipping.
 
 ## MANDATORY CHECKLIST — Do ALL of these, not just some
