@@ -14,6 +14,11 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 
 ## Features (12 tools)
 
+### 🤖 AI Content Safety
+| Tool | What it does |
+|------|-------------|
+| `ai_guard_evaluate` | Detect harmful content, PII leakage, prompt injection, sensitive data exposure |
+
 ### 🦠 Malware & File Security
 | Tool | What it does |
 |------|-------------|
@@ -50,11 +55,6 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 | Tool | What it does |
 |------|-------------|
 | `get_cve_details` | Get detailed CVE information with CVSS scores, mitigation, affected asset counts |
-
-### 🤖 AI Content Safety
-| Tool | What it does |
-|------|-------------|
-| `ai_guard_evaluate` | Detect harmful content, PII leakage, prompt injection, sensitive data exposure |
 
 ### ⚙️ Quota Management
 | Tool | What it does |
