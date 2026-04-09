@@ -88,8 +88,6 @@ remediation steps for any issues.
 
 ### Threat Intelligence
 - **check_suspicious_objects**: Look up URLs, domains, IPs, file hashes, emails.
-- **add_suspicious_objects**: Add indicators to the blocklist.
-- **remove_suspicious_objects**: Remove indicators from the blocklist.
 - **get_threat_indicators**: Get IoCs (STIX 2.1) from threat feeds.
 - **get_threat_reports**: Get intelligence reports by location/industry.
 
@@ -303,39 +301,7 @@ async def sandbox_list_submissions(
     return await sandbox.list_submissions(_ctx(ctx), status, action, top)
 
 
-# --- Threat Intelligence (write + feeds) ---
-
-
-@mcp.tool()
-async def add_suspicious_objects(
-    ctx: Context,
-    objects: list[dict],
-) -> dict:
-    """Add indicators (URLs, domains, IPs, file hashes, emails) to the Vision One suspicious object blocklist.
-
-    Each object dict must include a type-specific key (e.g., {"url": "http://evil.com"})
-    and can optionally include: description, scanAction (block/log), riskLevel (high/medium/low),
-    daysToExpiration (1-365, or -1 for no expiration, default 30).
-
-    Args:
-        objects: List of objects to add. Each must have one of: url, domain, ip, fileSha1, fileSha256, senderMailAddress.
-    """
-    return await threat_intel.add_suspicious_objects(_ctx(ctx), objects)
-
-
-@mcp.tool()
-async def remove_suspicious_objects(
-    ctx: Context,
-    objects: list[dict],
-) -> dict:
-    """Remove indicators from the Vision One suspicious object blocklist.
-
-    Each object dict needs only the type-specific key (e.g., {"url": "http://evil.com"}).
-
-    Args:
-        objects: List of objects to remove. Each must have one of: url, domain, ip, fileSha1, fileSha256, senderMailAddress.
-    """
-    return await threat_intel.remove_suspicious_objects(_ctx(ctx), objects)
+# --- Threat Intelligence (feeds) ---
 
 
 @mcp.tool()

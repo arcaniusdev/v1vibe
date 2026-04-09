@@ -3,7 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from v1vibe.clients import AppContext
-from v1vibe.utils import check_response, format_error
+from v1vibe.utils import check_response, format_error, sanitize_filter_value
+
+VALID_ALERT_STATUSES = {"Open", "In Progress", "Closed"}
+VALID_SEVERITIES = {"critical", "high", "medium", "low"}
 
 
 async def search_detections(
@@ -21,11 +24,11 @@ async def search_detections(
         if end_date_time:
             params["endDateTime"] = end_date_time
         if fields:
-            params["select"] = ",".join(fields)
+            params["select"] = ",".join(sanitize_filter_value(f) for f in fields)
 
         resp = await ctx.http.get(
             "/v3.0/search/detections",
-            headers={"TMV1-Query": query},
+            headers={"TMV1-Query": sanitize_filter_value(query)},
             params=params,
         )
         return check_response(resp)
@@ -51,8 +54,22 @@ async def list_alerts(
         headers: dict[str, str] = {}
         filter_parts = []
         if status:
+            if status not in VALID_ALERT_STATUSES:
+                return {
+                    "error": {
+                        "code": "InvalidInput",
+                        "message": f"Invalid status '{status}'. Must be one of: {', '.join(sorted(VALID_ALERT_STATUSES))}",
+                    }
+                }
             filter_parts.append(f"status eq '{status}'")
         if severity:
+            if severity not in VALID_SEVERITIES:
+                return {
+                    "error": {
+                        "code": "InvalidInput",
+                        "message": f"Invalid severity '{severity}'. Must be one of: {', '.join(sorted(VALID_SEVERITIES))}",
+                    }
+                }
             filter_parts.append(f"severity eq '{severity}'")
         if filter_parts:
             headers["TMV1-Filter"] = " and ".join(filter_parts)

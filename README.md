@@ -2,7 +2,7 @@
 
 An MCP server that gives AI coding assistants real-time security validation powered by [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Scan files for malware, detonate suspicious files and URLs in a cloud sandbox, look up threat intelligence, and validate AI-generated content — all from within your AI coding workflow.
 
-## Features (23 tools)
+## Features (21 tools)
 
 ### File & Code Security
 | Tool | What it does |
@@ -21,8 +21,6 @@ An MCP server that gives AI coding assistants real-time security validation powe
 | Tool | What it does |
 |------|-------------|
 | `check_suspicious_objects` | Look up URLs, domains, IPs, or file hashes in threat intelligence |
-| `add_suspicious_objects` | Add indicators to the suspicious object blocklist |
-| `remove_suspicious_objects` | Remove indicators from the blocklist |
 | `get_threat_indicators` | Get IoCs (STIX 2.1) from Trend threat intelligence feeds |
 | `get_threat_reports` | Get intelligence reports filtered by location and industry |
 

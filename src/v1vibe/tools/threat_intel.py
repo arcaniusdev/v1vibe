@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from v1vibe.clients import AppContext
-from v1vibe.utils import check_multi_status, check_response, format_error
+from v1vibe.utils import check_response, format_error, sanitize_filter_value
 
 VALID_TYPES = {"url", "domain", "ip", "fileSha1", "fileSha256", "senderMailAddress"}
+VALID_RISK_LEVELS = {"high", "medium", "low"}
 
 
 async def check_suspicious_objects(
@@ -23,10 +24,17 @@ async def check_suspicious_objects(
                 }
             }
 
-        filter_parts = [f"type eq '{object_type}'"]
-        filter_parts.append(f"{object_type} eq '{value}'")
+        safe_value = sanitize_filter_value(value)
+        filter_parts = [f"type eq '{object_type}'", f"{object_type} eq '{safe_value}'"]
 
         if risk_level:
+            if risk_level not in VALID_RISK_LEVELS:
+                return {
+                    "error": {
+                        "code": "InvalidInput",
+                        "message": f"Invalid risk_level '{risk_level}'. Must be one of: high, medium, low",
+                    }
+                }
             filter_parts.append(f"riskLevel eq '{risk_level}'")
 
         filter_expr = " and ".join(filter_parts)
@@ -37,42 +45,6 @@ async def check_suspicious_objects(
             params={"top": 50},
         )
         return check_response(resp)
-    except Exception as exc:
-        return format_error(exc)
-
-
-async def add_suspicious_objects(
-    ctx: AppContext,
-    objects: list[dict[str, Any]],
-) -> dict[str, Any]:
-    try:
-        if not objects:
-            return {"error": {"code": "InvalidInput", "message": "At least one object is required"}}
-
-        resp = await ctx.http.post(
-            "/v3.0/threatintel/suspiciousObjects",
-            json=objects,
-        )
-        results = check_multi_status(resp)
-        return {"items": results}
-    except Exception as exc:
-        return format_error(exc)
-
-
-async def remove_suspicious_objects(
-    ctx: AppContext,
-    objects: list[dict[str, Any]],
-) -> dict[str, Any]:
-    try:
-        if not objects:
-            return {"error": {"code": "InvalidInput", "message": "At least one object is required"}}
-
-        resp = await ctx.http.post(
-            "/v3.0/threatintel/suspiciousObjects/delete",
-            json=objects,
-        )
-        results = check_multi_status(resp)
-        return {"items": results}
     except Exception as exc:
         return format_error(exc)
 
@@ -118,9 +90,9 @@ async def get_threat_reports(
         if location or industry:
             filter_parts = []
             if location:
-                filter_parts.append(f"location eq '{location}'")
+                filter_parts.append(f"location eq '{sanitize_filter_value(location)}'")
             if industry:
-                filter_parts.append(f"industry eq '{industry}'")
+                filter_parts.append(f"industry eq '{sanitize_filter_value(industry)}'")
             headers["TMV1-Contextual-Filter"] = " and ".join(filter_parts)
 
         resp = await ctx.http.get(

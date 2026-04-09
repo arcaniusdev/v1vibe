@@ -5,7 +5,10 @@ import os
 from typing import Any
 
 from v1vibe.clients import AppContext
-from v1vibe.utils import check_multi_status, check_response, format_error
+from v1vibe.utils import check_multi_status, check_response, format_error, sanitize_filter_value
+
+VALID_SUBMISSION_STATUSES = {"succeeded", "running", "failed"}
+VALID_SUBMISSION_ACTIONS = {"analyzeFile", "analyzeUrl"}
 
 
 async def submit_file(
@@ -134,8 +137,22 @@ async def list_submissions(
         headers: dict[str, str] = {}
         filter_parts = []
         if status:
+            if status not in VALID_SUBMISSION_STATUSES:
+                return {
+                    "error": {
+                        "code": "InvalidInput",
+                        "message": f"Invalid status '{status}'. Must be one of: {', '.join(sorted(VALID_SUBMISSION_STATUSES))}",
+                    }
+                }
             filter_parts.append(f"status eq '{status}'")
         if action:
+            if action not in VALID_SUBMISSION_ACTIONS:
+                return {
+                    "error": {
+                        "code": "InvalidInput",
+                        "message": f"Invalid action '{action}'. Must be one of: {', '.join(sorted(VALID_SUBMISSION_ACTIONS))}",
+                    }
+                }
             filter_parts.append(f"action eq '{action}'")
         if filter_parts:
             headers["TMV1-Filter"] = " and ".join(filter_parts)

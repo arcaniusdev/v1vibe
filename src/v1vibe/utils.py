@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import httpx
+
+# Strip characters that could break filter/query header expressions
+_UNSAFE_FILTER_CHARS = re.compile(r"['\";()\\]")
+
+
+def sanitize_filter_value(value: str) -> str:
+    return _UNSAFE_FILTER_CHARS.sub("", value)
 
 
 def format_error(exc: Exception) -> dict[str, Any]:
