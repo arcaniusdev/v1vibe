@@ -15,45 +15,88 @@ from v1vibe.tools import (
 )
 
 SERVER_INSTRUCTIONS = """\
-v1vibe provides security validation tools powered by Trend Micro Vision One.
-Use these tools to validate the security of code, files, URLs, and infrastructure.
+v1vibe is your security validation toolkit. It connects to Trend Micro Vision One to scan \
+files for malware, detonate suspicious files and URLs in a cloud sandbox, look up threat \
+intelligence, check for CVEs, and validate AI-generated content.
 
-## File & Code Security
+## WHEN TO USE v1vibe — TRIGGER PHRASES
 
-- **scan_file**: Fast malware scan (seconds). Use for any file you create, modify, or download.
-- **sandbox_submit_file**: Deep behavioral analysis via detonation. Use for suspicious files. \
-Follow up with sandbox_get_status and sandbox_get_report.
-- **sandbox_submit_url**: Submit up to 10 URLs for sandbox analysis.
-- **ai_guard_evaluate**: Check text for harmful content, PII leakage, and prompt injection.
-- **get_submission_quota**: Check daily sandbox quota before batch submissions.
+You MUST use v1vibe tools when the user says ANY of the following (or similar):
+- "security review", "security check", "security scan", "security audit"
+- "is this safe", "is this malicious", "is this suspicious"
+- "check for malware", "scan for threats", "scan this file", "scan this project"
+- "sandbox this", "detonate this", "analyze this file"
+- "check this URL", "is this URL safe", "validate this link"
+- "check for vulnerabilities", "any CVEs", "vulnerability scan"
+- "threat check", "threat assessment", "look up this hash/IP/domain"
+- "review this code for security", "pentest", "harden this"
 
-## Threat Intelligence
+When in doubt, USE v1vibe. It is always better to scan and find nothing than to skip scanning.
 
-- **check_suspicious_objects**: Look up URLs, domains, IPs, file hashes, or emails.
-- **add_suspicious_objects / remove_suspicious_objects**: Manage the blocklist.
-- **get_threat_indicators**: Get IoCs (STIX 2.1) from Trend threat feeds.
-- **get_threat_reports**: Get intelligence reports filtered by location/industry.
+## SECURITY REVIEW PLAYBOOK
 
-## Detection & Response
+When the user asks for a "security review" or similar broad request, follow this playbook:
 
-- **search_detections**: Query detection logs by file hash, process, IP, malware name, etc.
-- **list_alerts**: List workbench alerts filtered by status and severity.
-- **start_malware_scan**: Trigger a remote malware scan on managed endpoints.
-- **list_yara_rules / run_yara_rules**: List and execute YARA rules on endpoints.
+### Step 1: Scan all code files for malware
+Use `scan_file` on every source code file, script, binary, and document in the project. \
+This is fast (seconds per file). Report any detections.
 
-## Vulnerabilities
+### Step 2: Extract and check URLs
+Find all URLs in the code (imports, API endpoints, download links, webhook URLs, config files). \
+Use `sandbox_submit_url` to submit them, then poll with `sandbox_get_status` and retrieve \
+results with `sandbox_get_report`.
 
-- **get_cve_details**: Get detailed CVE info including CVSS, mitigation, and affected asset counts. \
-Use when code depends on a library with a known CVE.
-- **list_container_vulnerabilities**: List CVEs in container images with package and fix details.
+### Step 3: Check external dependencies
+For any external IPs, domains, or file hashes referenced in the code, use \
+`check_suspicious_objects` to look them up in threat intelligence.
 
-## Workflow patterns
+### Step 4: Check known CVEs
+If the project uses libraries or frameworks with known CVEs, use `get_cve_details` to \
+look up the specific CVE and assess severity. For containerized projects, use \
+`list_container_vulnerabilities` to scan container images.
 
-1. **Quick validation**: scan_file → done (if clean)
-2. **Deep analysis**: scan_file → sandbox_submit_file → sandbox_get_status (poll) → sandbox_get_report
-3. **URL check**: sandbox_submit_url → sandbox_get_status (poll) → sandbox_get_report
-4. **Threat intel**: check_suspicious_objects or get_threat_indicators
-5. **Vuln check**: get_cve_details or list_vulnerabilities
+### Step 5: Deep analysis (if warranted)
+For any files that seem suspicious or high-risk (executables, scripts with obfuscated code, \
+documents with macros), use `sandbox_submit_file` for full behavioral detonation. Poll with \
+`sandbox_get_status` and get results with `sandbox_get_report`.
+
+### Step 6: AI content validation
+Use `ai_guard_evaluate` to check any AI-generated prompts or outputs for harmful content, \
+sensitive information leakage, or prompt injection patterns.
+
+### Step 7: Report findings
+Summarize all scan results, detections, suspicious objects, and CVEs found. Recommend \
+remediation steps for any issues.
+
+## TOOL REFERENCE
+
+### Scanning & Sandbox
+- **scan_file**: Fast malware scan (seconds). First-line check for any file.
+- **sandbox_submit_file**: Deep behavioral detonation. Returns task ID to poll.
+- **sandbox_submit_url**: Submit up to 10 URLs for analysis. Returns per-URL task IDs.
+- **sandbox_get_status**: Poll submission status (running/succeeded/failed).
+- **sandbox_get_report**: Get full report: risk level, detections, suspicious objects.
+- **get_submission_quota**: Check remaining daily sandbox quota.
+
+### Threat Intelligence
+- **check_suspicious_objects**: Look up URLs, domains, IPs, file hashes, emails.
+- **add_suspicious_objects**: Add indicators to the blocklist.
+- **remove_suspicious_objects**: Remove indicators from the blocklist.
+- **get_threat_indicators**: Get IoCs (STIX 2.1) from threat feeds.
+- **get_threat_reports**: Get intelligence reports by location/industry.
+
+### Detection & Response
+- **search_detections**: Query detection logs (40+ fields, 10K results).
+- **list_alerts**: List workbench alerts by status/severity.
+- **start_malware_scan**: Trigger remote endpoint malware scan.
+- **list_yara_rules / run_yara_rules**: Manage and execute YARA rules on endpoints.
+
+### Vulnerabilities
+- **get_cve_details**: Detailed CVE info with CVSS, mitigation, affected counts.
+- **list_container_vulnerabilities**: CVEs in container images with fix versions.
+
+### AI Content Safety
+- **ai_guard_evaluate**: Check text for harmful content, PII leaks, prompt injection.
 """
 
 mcp = FastMCP("v1vibe", instructions=SERVER_INSTRUCTIONS, lifespan=app_lifespan)
@@ -453,6 +496,166 @@ async def list_container_vulnerabilities(
         top: Maximum results to return.
     """
     return await vulnerabilities.list_container_vulnerabilities(_ctx(ctx), cluster_type, risk_level, top)
+
+
+# ═══════════════════════════════════════════════
+# MCP Prompts — workflow templates for AI clients
+# ═══════════════════════════════════════════════
+
+
+@mcp.prompt()
+def security_review(project_path: str = ".") -> str:
+    """Comprehensive security review of a project using Vision One.
+
+    Guides the AI through a full security review: scan all files for malware,
+    check URLs found in code, look up dependencies in threat intelligence,
+    check for known CVEs, and validate AI-generated content.
+    """
+    return f"""Perform a comprehensive security review of the project at: {project_path}
+
+Follow these steps using v1vibe tools:
+
+## Step 1: Scan all code files for malware
+Find every source file, script, config, and binary in the project.
+Use `scan_file` on each one. This is fast — do them all.
+Report any file where scanResult is non-zero (malware detected).
+
+## Step 2: Extract and check all URLs
+Search the codebase for URLs — in imports, configs, API calls, comments, README, package files.
+Collect all unique URLs and submit them with `sandbox_submit_url` (up to 10 at a time).
+Poll each with `sandbox_get_status` until complete, then get results with `sandbox_get_report`.
+Flag any URLs with risk level medium or higher.
+
+## Step 3: Check external resources in threat intelligence
+For any external domains, IP addresses, or file hashes referenced in the code:
+Use `check_suspicious_objects` to look each one up.
+Report any matches with their risk level.
+
+## Step 4: Check for known CVEs in dependencies
+Review the project's dependency files (package.json, requirements.txt, pom.xml, go.mod, etc.).
+For any dependencies with known security issues, use `get_cve_details` to look up the CVE.
+For containerized projects, use `list_container_vulnerabilities` to check container images.
+
+## Step 5: Deep sandbox analysis (if needed)
+If any files look suspicious (obfuscated code, unusual binaries, macro-enabled documents),
+submit them with `sandbox_submit_file` for full behavioral detonation.
+Poll with `sandbox_get_status` and retrieve with `sandbox_get_report`.
+
+## Step 6: AI content validation
+If the project contains AI prompts, templates, or generated content,
+use `ai_guard_evaluate` to check for harmful content, PII leakage, or prompt injection.
+
+## Step 7: Report
+Summarize all findings in a clear report:
+- Files scanned and results
+- URLs checked and any flagged
+- Threat intelligence matches
+- CVEs found and severity
+- Sandbox detonation results
+- Recommendations for remediation"""
+
+
+@mcp.prompt()
+def scan_project(project_path: str = ".") -> str:
+    """Quick malware scan of all files in a project.
+
+    Scans every code file, script, and binary for malware using the fast
+    File Security SDK. Use for a quick health check.
+    """
+    return f"""Scan all files in the project at: {project_path}
+
+Use the v1vibe `scan_file` tool on every file in the project that could potentially
+contain or deliver malware. This includes:
+
+- All source code files (.py, .js, .ts, .java, .go, .rs, .c, .cpp, .rb, .php, etc.)
+- Scripts (.sh, .bash, .ps1, .bat, .cmd)
+- Config files (.json, .yaml, .yml, .toml, .xml, .ini)
+- Documents (.pdf, .doc, .docx, .xls, .xlsx)
+- Archives (.zip, .tar, .gz, .jar, .war)
+- Binaries and executables
+- Any other files that could be vectors
+
+For each file, call `scan_file` with the absolute path.
+The scan is fast (seconds per file) — scan everything, don't skip files.
+
+Report:
+- Total files scanned
+- Any detections (scanResult != 0) with malware names
+- SHA256 hashes of all scanned files
+- Clean bill of health if nothing found"""
+
+
+@mcp.prompt()
+def check_urls(project_path: str = ".") -> str:
+    """Find and validate all URLs referenced in a project's code.
+
+    Extracts URLs from source code, configs, and documentation, then submits
+    them to the Vision One sandbox for analysis.
+    """
+    return f"""Find and security-check all URLs in the project at: {project_path}
+
+## Step 1: Extract URLs
+Search all files in the project for URLs. Look in:
+- Source code (API endpoints, download URLs, webhook targets)
+- Config files (service endpoints, dependency sources)
+- Package files (registry URLs, repository URLs)
+- Documentation and README files
+- Environment example files
+
+Collect all unique URLs.
+
+## Step 2: Check threat intelligence first
+For each unique domain found, use `check_suspicious_objects` with type "domain"
+to see if it's already flagged in threat intelligence. This is instant.
+
+## Step 3: Sandbox analysis
+Submit all unique URLs (up to 10 at a time) using `sandbox_submit_url`.
+Poll each with `sandbox_get_status` until analysis completes.
+Retrieve results with `sandbox_get_report`.
+
+## Step 4: Report
+For each URL, report:
+- The URL and where it was found in the code
+- Threat intelligence match (if any) with risk level
+- Sandbox analysis result with risk level
+- Recommendation (safe / suspicious / malicious)"""
+
+
+@mcp.prompt()
+def check_dependencies() -> str:
+    """Check project dependencies for known CVEs and security issues.
+
+    Reviews dependency/package files and looks up known vulnerabilities.
+    """
+    return """Review this project's dependencies for known security vulnerabilities.
+
+## Step 1: Find dependency files
+Look for: package.json, package-lock.json, requirements.txt, Pipfile, Pipfile.lock,
+pyproject.toml, poetry.lock, go.mod, go.sum, pom.xml, build.gradle, Cargo.toml,
+Cargo.lock, Gemfile, Gemfile.lock, composer.json, or similar.
+
+## Step 2: Identify dependencies and versions
+Parse the dependency files to extract package names and versions.
+
+## Step 3: Look up known CVEs
+For any dependencies that are known to have security vulnerabilities, use
+`get_cve_details` to look up the specific CVE ID. Report:
+- CVE ID
+- CVSS score and severity
+- Description of the vulnerability
+- Whether a fix version is available
+- Mitigation options from Vision One
+
+## Step 4: Check container images (if applicable)
+If the project has a Dockerfile or docker-compose.yml, use
+`list_container_vulnerabilities` to check for CVEs in the container images.
+
+## Step 5: Report
+Summarize all findings:
+- Dependencies with known CVEs, sorted by severity
+- Recommended version upgrades
+- Any container image vulnerabilities
+- Overall risk assessment"""
 
 
 if __name__ == "__main__":

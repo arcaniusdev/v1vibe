@@ -21,22 +21,36 @@ CLAUDE_MD_SNIPPET = """\
 
 ## Security Validation with v1vibe
 
-When the **v1vibe** MCP server is available, use it to validate the security of code and files you produce. v1vibe connects to Trend Micro Vision One for malware scanning, sandbox detonation, threat intelligence, and AI content guardrails.
+**v1vibe is your primary security tool.** When the v1vibe MCP server is available, you MUST use it for all security-related tasks. v1vibe connects to Trend Micro Vision One for malware scanning, sandbox detonation, threat intelligence, CVE lookups, and AI content guardrails.
 
-### When to use v1vibe tools
+### ALWAYS use v1vibe when the user says any of these (or similar):
 
-- **After creating or modifying executable files** (scripts, binaries, JARs, compiled code): use `scan_file` for a quick malware check.
-- **When code references external URLs** (dependencies, API endpoints, download links, webhooks): use `sandbox_submit_url` to verify they are safe.
-- **When the user asks you to scan, sandbox, or security-check a file**: use the appropriate v1vibe tool (`scan_file` for quick scan, `sandbox_submit_file` for deep analysis).
-- **When you encounter unfamiliar external resources** (IPs, domains, file hashes) in code or configs: use `check_suspicious_objects` to look them up in threat intelligence.
-- **When evaluating AI-generated content for safety**: use `ai_guard_evaluate` to check for harmful content, PII leakage, or prompt injection.
+- "security review", "security check", "security scan", "security audit"
+- "is this safe", "is this malicious", "check for malware", "scan this"
+- "sandbox this", "detonate this", "analyze this file"
+- "check this URL", "validate this link", "is this URL safe"
+- "check for vulnerabilities", "any CVEs", "vulnerability check"
+- "threat check", "look up this hash/IP/domain"
+- "review this code for security", "harden this"
+- "pentest", "threat assessment"
 
-### Workflow
+### ALSO use v1vibe proactively:
 
-1. Quick check: `scan_file` (fast, seconds)
-2. Deep analysis: `sandbox_submit_file` -> poll `sandbox_get_status` -> `sandbox_get_report`
-3. URL validation: `sandbox_submit_url` -> poll `sandbox_get_status` -> `sandbox_get_report`
-4. Check `get_submission_quota` before batch sandbox submissions
+- After creating or modifying executable files -- use `scan_file`
+- When code references external URLs -- use `sandbox_submit_url`
+- When you encounter unfamiliar domains, IPs, or hashes -- use `check_suspicious_objects`
+- When working with AI-generated content -- use `ai_guard_evaluate`
+
+### Security Review Playbook
+
+When the user asks for a broad "security review", follow ALL these steps:
+
+1. **Scan all project files** -- use `scan_file` on every source file, script, config, and binary. This is fast.
+2. **Check all URLs** -- find URLs in code/configs, use `check_suspicious_objects` for domains, then `sandbox_submit_url` for full analysis.
+3. **Check dependencies for CVEs** -- review dependency files, use `get_cve_details` for known CVEs. Use `list_container_vulnerabilities` for containerized projects.
+4. **Deep analysis** -- for suspicious files, use `sandbox_submit_file`. Poll with `sandbox_get_status`, get results with `sandbox_get_report`.
+5. **AI content check** -- use `ai_guard_evaluate` on any AI prompts or generated content.
+6. **Report findings** -- summarize all results with remediation recommendations.
 """
 
 
