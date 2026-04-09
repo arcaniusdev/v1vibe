@@ -5,12 +5,75 @@ from __future__ import annotations
 import json
 import os
 import platform
+import shlex
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
 from v1vibe.clients import AppContext
+
+# TMAS version - single source of truth for both binary and Docker modes
+TMAS_VERSION = "2.221.0"
+
+# Docker image for TMAS execution on macOS
+DOCKER_IMAGE = "ubuntu:22.04"
+
+# Scan timeout (10 minutes)
+SCAN_TIMEOUT_SECONDS = 600
+
+# Forbidden paths to prevent scanning system directories
+# Note: macOS symlinks like /etc -> /private/etc are handled by including both
+FORBIDDEN_PATHS = [
+    "/etc", "/private/etc",
+    "/sys",
+    "/proc",
+    "/dev",
+    "/boot",
+    "/root", "/var/root",
+    "/bin", "/sbin",
+    "/usr/bin", "/usr/sbin",
+    "/System",  # macOS system directory
+]
+
+
+def _validate_artifact_path(artifact: str) -> str:
+    """Validate artifact path to prevent path traversal attacks.
+
+    Args:
+        artifact: Path to validate
+
+    Returns:
+        Validated absolute path
+
+    Raises:
+        ValueError: If path is forbidden
+    """
+    # Handle container image references (don't validate as filesystem paths)
+    if any(artifact.startswith(prefix) for prefix in ["registry:", "docker:", "docker-archive:", "oci-archive:"]):
+        return artifact
+
+    # Handle dir: prefix
+    if artifact.startswith("dir:"):
+        artifact = artifact[4:]
+
+    # Resolve to absolute path
+    try:
+        resolved = Path(artifact).resolve()
+    except (OSError, RuntimeError) as e:
+        raise ValueError(f"Invalid path: {e}")
+
+    # Check if path exists
+    if not resolved.exists():
+        raise ValueError(f"Path does not exist: {resolved}")
+
+    # Prevent access to system directories
+    resolved_str = str(resolved)
+    for forbidden in FORBIDDEN_PATHS:
+        if resolved_str.startswith(forbidden):
+            raise ValueError(f"Access to {forbidden} is not allowed for security reasons")
+
+    return resolved_str
 
 
 async def scan_artifact(
@@ -53,6 +116,17 @@ async def scan_artifact(
             }
         }
 
+    # Validate artifact path to prevent path traversal
+    try:
+        artifact_validated = _validate_artifact_path(artifact)
+    except ValueError as e:
+        return {
+            "error": {
+                "code": "InvalidPath",
+                "message": str(e),
+            }
+        }
+
     # Check TMAS availability
     tmas_path = ctx.settings.tmas_binary_path
     use_docker = False
@@ -92,21 +166,36 @@ async def scan_artifact(
 
         if use_docker:
             # Docker mode for macOS
-            # Convert artifact path to absolute
-            artifact_abs = str(Path(artifact).resolve())
+            # Use validated path
+            artifact_abs = artifact_validated
 
-            # Build Docker command
+            # Validate additional_args to prevent command injection
+            validated_extra_args = []
+            if additional_args:
+                # Reject any additional_args with shell metacharacters
+                if any(char in additional_args for char in [";", "|", "&", "$", "`", "(", ")", "<", ">"]):
+                    return {
+                        "error": {
+                            "code": "InvalidArguments",
+                            "message": "additional_args contains unsafe shell metacharacters",
+                        }
+                    }
+                # Quote each argument for safe shell usage
+                for arg in additional_args.split():
+                    validated_extra_args.append(shlex.quote(arg))
+
+            # Build Docker command (no shell=True, so no injection risk here)
             cmd = [
                 "docker", "run", "--rm",
                 "-v", f"{artifact_abs}:/scan:ro",  # Mount artifact read-only
                 "-v", f"{tmpdir}:/output",  # Mount output directory
                 "-e", f"TMAS_API_KEY={ctx.settings.api_token}",
                 "-w", "/tmp",
-                "ubuntu:22.04",
+                DOCKER_IMAGE,
                 "sh", "-c",
             ]
 
-            # Build the shell command to run inside container
+            # Build the shell command to run inside container with proper escaping
             tmas_flags = []
             if "vulnerability" in scan_types:
                 tmas_flags.append("-V")
@@ -115,26 +204,41 @@ async def scan_artifact(
             if "secrets" in scan_types:
                 tmas_flags.append("-S")
 
-            region_flag = f"--region {ctx.settings.region}"
-            if additional_args and "--region" in additional_args:
-                region_flag = ""
+            # Region is already validated by Settings, but quote it for safety
+            region_quoted = shlex.quote(ctx.settings.region)
 
-            shell_cmd = (
-                f"apt-get update -qq && apt-get install -y -qq curl > /dev/null 2>&1 && "
-                f"ARCH=$(uname -m); [ \"$ARCH\" = \"aarch64\" ] && ARCH=\"arm64\" || true; "
-                f"curl -sL https://ast-cli.xdr.trendmicro.com/tmas-cli/2.221.0/tmas-cli_Linux_$ARCH.tar.gz | tar xz && "
-                f"./tmas scan dir:/scan {' '.join(tmas_flags)} {region_flag} "
-                f"--redacted --output=json=/output/tmas_scan_report.json"
-            )
+            # Skip region if it's in additional_args (avoid duplication)
+            include_region = not (additional_args and "--region" in additional_args)
 
-            if additional_args:
-                shell_cmd += f" {additional_args}"
+            # Build shell command with proper quoting
+            # Note: Internal shell variables like $ARCH are intentionally not quoted
+            tmas_url = f"https://ast-cli.xdr.trendmicro.com/tmas-cli/{TMAS_VERSION}/tmas-cli_Linux_$ARCH.tar.gz"
 
+            shell_cmd_parts = [
+                "apt-get update -qq && apt-get install -y -qq curl > /dev/null 2>&1 &&",
+                "ARCH=$(uname -m); [ \"$ARCH\" = \"aarch64\" ] && ARCH=\"arm64\" || true;",
+                f"curl -sL {shlex.quote(tmas_url)} | tar xz &&",
+                "./tmas scan dir:/scan",
+                " ".join(tmas_flags),
+            ]
+
+            if include_region:
+                shell_cmd_parts.append(f"--region {region_quoted}")
+
+            shell_cmd_parts.extend([
+                "--redacted",
+                "--output=json=/output/tmas_scan_report.json",
+            ])
+
+            if validated_extra_args:
+                shell_cmd_parts.extend(validated_extra_args)
+
+            shell_cmd = " ".join(shell_cmd_parts)
             cmd.append(shell_cmd)
             env = None  # Docker -e flag handles API key
         else:
             # Binary mode for Linux/Windows
-            cmd = [tmas_path, "scan", artifact]
+            cmd = [tmas_path, "scan", artifact_validated]
 
             # Add scan type flags
             if "vulnerability" in scan_types:
@@ -153,8 +257,19 @@ async def scan_artifact(
             # Add output format args
             cmd.extend(["--redacted", f"--output=json={output_file}"])
 
-            # Add any additional arguments
+            # Add any additional arguments (validated)
             if additional_args:
+                # Validate additional_args to prevent command injection
+                # Note: subprocess.run with list args (not shell=True) prevents injection,
+                # but we still validate to prevent unexpected behavior
+                if any(char in additional_args for char in [";", "|", "&", "$", "`", "(", ")", "<", ">"]):
+                    return {
+                        "error": {
+                            "code": "InvalidArguments",
+                            "message": "additional_args contains unsafe shell metacharacters",
+                        }
+                    }
+                # Add arguments (no escaping needed since we use list format)
                 cmd.extend(additional_args.split())
 
             # Set environment variable for API key
@@ -166,7 +281,7 @@ async def scan_artifact(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=600,  # 10 minute timeout
+                timeout=SCAN_TIMEOUT_SECONDS,
                 env=env,
             )
 
@@ -203,7 +318,7 @@ async def scan_artifact(
             return {
                 "error": {
                     "code": "ScanTimeout",
-                    "message": "TMAS scan exceeded 10 minute timeout",
+                    "message": f"TMAS scan exceeded {SCAN_TIMEOUT_SECONDS} second timeout",
                 }
             }
         except Exception as e:

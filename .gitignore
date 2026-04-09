@@ -6,3 +6,18 @@ build/
 .venv/
 .env
 *.egg
+
+# API specifications (local development only, contains sensitive endpoints)
+sp-api-open-*.json
+
+# Project-level CLAUDE.md (user-specific)
+CLAUDE.md
+
+# Documentation directory (may contain sensitive examples)
+docs/
+
+# macOS system files
+.DS_Store
+
+# Test files
+test_*.py

@@ -66,6 +66,7 @@ When the user asks for any security review, check, or scan, complete EVERY step:
 """
 
 TMAS_BASE_URL = "https://ast-cli.xdr.trendmicro.com/tmas-cli"
+TMAS_VERSION = "2.221.0"  # TMAS CLI version - update this to upgrade
 TMAS_BIN_DIR = CONFIG_DIR / "bin"
 
 
@@ -113,21 +114,10 @@ def _get_platform_info() -> tuple[str, str, str]:
 def _install_tmas() -> str | None:
     """Downloads and installs TMAS CLI. Returns path to binary or None on failure."""
     try:
-        # 1. Fetch metadata
-        metadata_url = f"{TMAS_BASE_URL}/metadata.json"
-        with urllib.request.urlopen(metadata_url, timeout=30) as resp:
-            metadata = json.load(resp)
+        # Use pinned version for security and reproducibility
+        version = TMAS_VERSION
 
-        version = metadata.get("latestV2")
-        if not version:
-            _print("  Error: Could not determine TMAS version")
-            return None
-
-        # Strip "v" prefix if present (metadata has "v2.221.0", URL needs "2.221.0")
-        if version.startswith("v"):
-            version = version[1:]
-
-        # 2. Get platform info
+        # Get platform info
         os_name, arch, ext = _get_platform_info()
 
         # 3. Download binary
