@@ -264,6 +264,45 @@ async def get_submission_quota(ctx: Context) -> dict:
     return await sandbox.get_submission_quota(_ctx(ctx))
 
 
+@mcp.tool()
+async def sandbox_get_investigation_package(
+    ctx: Context,
+    result_id: str,
+    save_path: str,
+) -> dict:
+    """Download the full forensic investigation package from a sandbox analysis.
+
+    Downloads a ZIP file containing detailed forensic artifacts from the sandbox
+    detonation — network captures, dropped files, registry changes, process trees, etc.
+    Use when sandbox_get_report shows suspicious activity and you need to dig deeper.
+
+    Args:
+        result_id: The result ID from sandbox_get_status resourceLocation.
+        save_path: Absolute path where the ZIP file should be saved.
+    """
+    return await sandbox.get_investigation_package(_ctx(ctx), result_id, save_path)
+
+
+@mcp.tool()
+async def sandbox_list_submissions(
+    ctx: Context,
+    status: str | None = None,
+    action: str | None = None,
+    top: int = 50,
+) -> dict:
+    """List past sandbox submissions with optional filtering.
+
+    Returns submission history including task IDs, status, timestamps, and file digests.
+    Use to review what has been previously scanned or to find a past submission's results.
+
+    Args:
+        status: Filter by status — one of: succeeded, running, failed.
+        action: Filter by type — one of: analyzeFile, analyzeUrl.
+        top: Maximum submissions to return.
+    """
+    return await sandbox.list_submissions(_ctx(ctx), status, action, top)
+
+
 # --- Threat Intelligence (write + feeds) ---
 
 

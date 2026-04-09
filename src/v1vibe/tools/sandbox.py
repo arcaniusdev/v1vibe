@@ -100,6 +100,56 @@ async def get_report(
         return format_error(exc)
 
 
+async def get_investigation_package(
+    ctx: AppContext,
+    result_id: str,
+    save_path: str,
+) -> dict[str, Any]:
+    try:
+        resp = await ctx.http.get(
+            f"/v3.0/sandbox/analysisResults/{result_id}/investigationPackage",
+        )
+        resp.raise_for_status()
+
+        with open(save_path, "wb") as f:
+            f.write(resp.content)
+
+        return {
+            "savedTo": save_path,
+            "sizeBytes": len(resp.content),
+        }
+    except Exception as exc:
+        return format_error(exc)
+
+
+async def list_submissions(
+    ctx: AppContext,
+    status: str | None = None,
+    action: str | None = None,
+    top: int = 50,
+) -> dict[str, Any]:
+    try:
+        params: dict[str, Any] = {"top": top, "orderBy": "createdDateTime desc"}
+
+        headers: dict[str, str] = {}
+        filter_parts = []
+        if status:
+            filter_parts.append(f"status eq '{status}'")
+        if action:
+            filter_parts.append(f"action eq '{action}'")
+        if filter_parts:
+            headers["TMV1-Filter"] = " and ".join(filter_parts)
+
+        resp = await ctx.http.get(
+            "/v3.0/sandbox/tasks",
+            params=params,
+            headers=headers,
+        )
+        return check_response(resp)
+    except Exception as exc:
+        return format_error(exc)
+
+
 async def get_submission_quota(
     ctx: AppContext,
 ) -> dict[str, Any]:
