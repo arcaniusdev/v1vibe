@@ -5,10 +5,7 @@ import os
 from typing import Any
 
 from v1vibe.clients import AppContext
-from v1vibe.utils import check_multi_status, check_response, format_error, sanitize_filter_value
-
-VALID_SUBMISSION_STATUSES = {"succeeded", "running", "failed"}
-VALID_SUBMISSION_ACTIONS = {"analyzeFile", "analyzeUrl"}
+from v1vibe.utils import check_multi_status, check_response, format_error
 
 
 async def submit_file(
@@ -99,70 +96,6 @@ async def get_report(
             result["suspiciousObjects"] = []
 
         return result
-    except Exception as exc:
-        return format_error(exc)
-
-
-async def get_investigation_package(
-    ctx: AppContext,
-    result_id: str,
-    save_path: str,
-) -> dict[str, Any]:
-    try:
-        resp = await ctx.http.get(
-            f"/v3.0/sandbox/analysisResults/{result_id}/investigationPackage",
-        )
-        resp.raise_for_status()
-
-        with open(save_path, "wb") as f:
-            f.write(resp.content)
-
-        return {
-            "savedTo": save_path,
-            "sizeBytes": len(resp.content),
-        }
-    except Exception as exc:
-        return format_error(exc)
-
-
-async def list_submissions(
-    ctx: AppContext,
-    status: str | None = None,
-    action: str | None = None,
-    top: int = 50,
-) -> dict[str, Any]:
-    try:
-        params: dict[str, Any] = {"top": top, "orderBy": "createdDateTime desc"}
-
-        headers: dict[str, str] = {}
-        filter_parts = []
-        if status:
-            if status not in VALID_SUBMISSION_STATUSES:
-                return {
-                    "error": {
-                        "code": "InvalidInput",
-                        "message": f"Invalid status '{status}'. Must be one of: {', '.join(sorted(VALID_SUBMISSION_STATUSES))}",
-                    }
-                }
-            filter_parts.append(f"status eq '{status}'")
-        if action:
-            if action not in VALID_SUBMISSION_ACTIONS:
-                return {
-                    "error": {
-                        "code": "InvalidInput",
-                        "message": f"Invalid action '{action}'. Must be one of: {', '.join(sorted(VALID_SUBMISSION_ACTIONS))}",
-                    }
-                }
-            filter_parts.append(f"action eq '{action}'")
-        if filter_parts:
-            headers["TMV1-Filter"] = " and ".join(filter_parts)
-
-        resp = await ctx.http.get(
-            "/v3.0/sandbox/tasks",
-            params=params,
-            headers=headers,
-        )
-        return check_response(resp)
     except Exception as exc:
         return format_error(exc)
 

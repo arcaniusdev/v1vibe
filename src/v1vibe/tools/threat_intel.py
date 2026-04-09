@@ -7,6 +7,7 @@ from v1vibe.utils import check_response, format_error, sanitize_filter_value
 
 VALID_TYPES = {"url", "domain", "ip", "fileSha1", "fileSha256", "senderMailAddress"}
 VALID_RISK_LEVELS = {"high", "medium", "low"}
+VALID_INDICATOR_TOPS = {1000, 5000, 10000}
 
 
 async def check_suspicious_objects(
@@ -56,7 +57,8 @@ async def get_threat_indicators(
     end_date_time: str | None = None,
 ) -> dict[str, Any]:
     try:
-        params: dict[str, Any] = {"top": top}
+        clamped_top = min((v for v in sorted(VALID_INDICATOR_TOPS) if v >= top), default=10000)
+        params: dict[str, Any] = {"top": clamped_top}
         if start_date_time:
             params["startDateTime"] = start_date_time
         if end_date_time:
@@ -71,35 +73,3 @@ async def get_threat_indicators(
         return format_error(exc)
 
 
-async def get_threat_reports(
-    ctx: AppContext,
-    top_report: int = 10,
-    location: str | None = None,
-    industry: str | None = None,
-    start_date_time: str | None = None,
-    end_date_time: str | None = None,
-) -> dict[str, Any]:
-    try:
-        params: dict[str, Any] = {"topReport": top_report}
-        if start_date_time:
-            params["startDateTime"] = start_date_time
-        if end_date_time:
-            params["endDateTime"] = end_date_time
-
-        headers: dict[str, str] = {}
-        if location or industry:
-            filter_parts = []
-            if location:
-                filter_parts.append(f"location eq '{sanitize_filter_value(location)}'")
-            if industry:
-                filter_parts.append(f"industry eq '{sanitize_filter_value(industry)}'")
-            headers["TMV1-Contextual-Filter"] = " and ".join(filter_parts)
-
-        resp = await ctx.http.get(
-            "/v3.0/threatintel/feeds",
-            params=params,
-            headers=headers,
-        )
-        return check_response(resp)
-    except Exception as exc:
-        return format_error(exc)

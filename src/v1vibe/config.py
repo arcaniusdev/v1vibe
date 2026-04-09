@@ -38,9 +38,12 @@ def load_config_file() -> dict:
 
 
 def save_config_file(api_token: str, region: str) -> None:
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    CONFIG_FILE.write_text(json.dumps({"api_token": api_token, "region": region}, indent=2))
-    CONFIG_FILE.chmod(0o600)
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_FILE.write_text(json.dumps({"api_token": api_token, "region": region}, indent=2))
+        CONFIG_FILE.chmod(0o600)
+    except OSError as exc:
+        raise RuntimeError(f"Failed to save config to {CONFIG_FILE}: {exc}") from exc
 
 
 def load_settings() -> Settings:

@@ -14,15 +14,24 @@ def sanitize_filter_value(value: str) -> str:
 
 
 def format_error(exc: Exception) -> dict[str, Any]:
+    """Format an exception into a safe error dict, never exposing secrets."""
     code = type(exc).__name__
     if isinstance(exc, httpx.HTTPStatusError):
         code = f"HTTP{exc.response.status_code}"
         try:
             body = exc.response.json()
-            message = body.get("error", {}).get("message", str(exc))
+            message = body.get("error", {}).get("message", "")
         except Exception:
-            message = exc.response.text or str(exc)
+            message = ""
+        if not message:
+            message = f"HTTP {exc.response.status_code} error from Vision One API"
+    elif isinstance(exc, httpx.HTTPError):
+        # Network errors — never call str() on httpx exceptions (may contain auth headers)
+        message = f"Network error: {type(exc).__name__}"
+    elif isinstance(exc, (FileNotFoundError, OSError)):
+        message = str(exc)
     else:
+        # Generic fallback — safe because non-httpx exceptions won't contain auth headers
         message = str(exc)
     return {"error": {"code": code, "message": message}}
 

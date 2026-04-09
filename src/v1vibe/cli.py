@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import os
 import shutil
 import subprocess
 import sys
@@ -64,7 +64,7 @@ async def _test_connectivity(api_token: str, base_url: str) -> dict | None:
         async with httpx.AsyncClient(
             base_url=base_url,
             headers={"Authorization": f"Bearer {api_token}"},
-            timeout=15.0,
+            timeout=30.0,
         ) as client:
             resp = await client.get("/v3.0/sandbox/submissionUsage")
             if resp.status_code == 200:
@@ -313,7 +313,7 @@ def cmd_test() -> None:
             async with httpx.AsyncClient(
                 base_url=settings.base_url,
                 headers={"Authorization": f"Bearer {settings.api_token}"},
-                timeout=15.0,
+                timeout=30.0,
             ) as client:
                 resp = await client.post(
                     "/v3.0/aiSecurity/applyGuardrails",
@@ -409,9 +409,6 @@ def cmd_status() -> None:
         _print("CLAUDE.md:   v1vibe instructions present")
     else:
         _print("CLAUDE.md:   v1vibe instructions not found (run: v1vibe setup)")
-
-
-import os
 
 
 def main() -> None:
