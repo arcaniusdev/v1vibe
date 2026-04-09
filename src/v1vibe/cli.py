@@ -179,6 +179,170 @@ def _get_tmas_version(tmas_path: str) -> str | None:
         return None
 
 
+def _install_docker_macos() -> bool:
+    """Prompt to install Docker on macOS. Returns True if Docker is available after install."""
+    _print()
+    _print("  Docker is required for artifact scanning on macOS.")
+    _print("  (TMAS CLI requires a Linux environment)")
+    _print()
+
+    # First, check if Docker is already installed and running
+    if _check_docker_running():
+        return True
+
+    # Docker not running - check if Homebrew is available for automated install
+    brew_path = shutil.which("brew")
+
+    if not brew_path:
+        # Homebrew not installed - offer to install it first
+        _print("  Homebrew package manager is needed to install Docker automatically.")
+        _print()
+        _print("  Installation options:")
+        _print("    1. Install Homebrew (one-time setup, enables automated installs)")
+        _print("    2. Download Docker Desktop manually")
+        _print("    3. Skip Docker (artifact scanning will be unavailable)")
+        _print()
+        choice = _input("  Choose option [1/2/3]: ").strip()
+
+        if choice == "1":
+            _print()
+            _print("  Installing Homebrew...")
+            _print("  This will run the official Homebrew install script.")
+            _print("  You may be prompted for your password.")
+            _print()
+            try:
+                # Run official Homebrew install script
+                result = subprocess.run(
+                    [
+                        "/bin/bash",
+                        "-c",
+                        "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)",
+                    ],
+                    capture_output=False,  # Show output to user
+                )
+
+                if result.returncode == 0:
+                    _print()
+                    _print("  ✓ Homebrew installed successfully!")
+                    _print()
+
+                    # Verify brew is now in PATH
+                    brew_path = shutil.which("brew")
+                    if not brew_path:
+                        _print("  Note: You may need to restart your terminal for Homebrew to be available.")
+                        _print("  After restart, run 'v1vibe setup' again.")
+                        return False
+                else:
+                    _print()
+                    _print("  Homebrew installation failed. Try manual installation.")
+                    return False
+            except Exception as e:
+                _print(f"  Error during Homebrew installation: {e}")
+                return False
+
+        elif choice == "2":
+            _print()
+            _print("  Manual installation:")
+            _print("    1. Download Docker Desktop: https://www.docker.com/products/docker-desktop")
+            _print("    2. Install the .dmg file")
+            _print("    3. Start Docker Desktop from Applications")
+            _print()
+            _input("  Press Enter after Docker Desktop is running...")
+            return _check_docker_running()
+
+        else:
+            _print("  Skipping Docker installation. Artifact scanning will be unavailable.")
+            return False
+
+    # Homebrew is available - offer Docker installation
+    _print("  Installation options:")
+    _print("    1. Install via Homebrew (automated, recommended)")
+    _print("    2. Download Docker Desktop manually")
+    _print("    3. Skip Docker (artifact scanning will be unavailable)")
+    _print()
+    choice = _input("  Choose option [1/2/3]: ").strip()
+
+    if choice == "1":
+        _print()
+        _print("  Installing Docker Desktop via Homebrew...")
+        _print("  This may take several minutes and requires sudo access.")
+        _print()
+        try:
+            # Install Docker Desktop via Homebrew
+            result = subprocess.run(
+                ["brew", "install", "--cask", "docker"],
+                capture_output=False,  # Show output to user
+                text=True,
+            )
+
+            if result.returncode == 0:
+                _print()
+                _print("  Docker Desktop installed successfully!")
+                _print("  Please start Docker Desktop from your Applications folder.")
+                _print()
+                _input("  Press Enter after Docker Desktop is running...")
+
+                # Check if Docker is now running
+                return _check_docker_running()
+            else:
+                _print()
+                _print("  Docker installation failed. Try manual installation.")
+                return False
+        except Exception as e:
+            _print(f"  Error during installation: {e}")
+            return False
+
+    elif choice == "2":
+        _print()
+        _print("  Manual installation:")
+        _print("    1. Download Docker Desktop: https://www.docker.com/products/docker-desktop")
+        _print("    2. Install the .dmg file")
+        _print("    3. Start Docker Desktop from Applications")
+        _print()
+        _input("  Press Enter after Docker Desktop is running...")
+        return _check_docker_running()
+
+    else:
+        _print("  Skipping Docker installation. Artifact scanning will be unavailable.")
+        return False
+
+
+def _check_docker_running() -> bool:
+    """Check if Docker is installed and running. Returns True if ready to use."""
+    docker_path = shutil.which("docker")
+
+    if not docker_path:
+        _print("  Docker command not found. Installation may not be complete.")
+        return False
+
+    _print("  Checking if Docker is running...")
+
+    # Try up to 3 times with delays (Docker Desktop can take time to start)
+    for attempt in range(3):
+        try:
+            result = subprocess.run(
+                ["docker", "info"],
+                capture_output=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                _print(f"  ✓ Docker is running: {docker_path}")
+                return True
+            else:
+                if attempt < 2:
+                    _print(f"  Docker not ready yet, waiting... (attempt {attempt + 1}/3)")
+                    import time
+                    time.sleep(3)
+        except Exception:
+            if attempt < 2:
+                import time
+                time.sleep(3)
+
+    _print("  Docker is installed but not running.")
+    _print("  Please start Docker Desktop and run 'v1vibe setup' again.")
+    return False
+
+
 async def _test_connectivity(api_token: str, base_url: str) -> dict | None:
     try:
         async with httpx.AsyncClient(
@@ -275,31 +439,18 @@ def cmd_setup() -> None:
     if system == "Darwin":
         # macOS: Check for Docker instead of installing binary
         _print("  Detected macOS: TMAS will run via Docker")
-        docker_path = shutil.which("docker")
-        if docker_path:
-            # Verify Docker is running
-            try:
-                result = subprocess.run(
-                    ["docker", "info"],
-                    capture_output=True,
-                    timeout=5,
-                )
-                if result.returncode == 0:
-                    _print(f"  Docker found: {docker_path}")
-                    _print("  Artifact scanning will use Linux TMAS in Docker container")
-                    tmas_path = "docker"  # Special marker for macOS Docker mode
-                else:
-                    _print("  Warning: Docker is installed but not running")
-                    _print("  Start Docker Desktop to enable artifact scanning")
-                    tmas_path = None
-            except Exception as e:
-                _print(f"  Warning: Docker check failed: {e}")
-                tmas_path = None
+
+        # Check if Docker is already available
+        if _check_docker_running():
+            _print("  Artifact scanning will use Linux TMAS in Docker container")
+            tmas_path = "docker"  # Special marker for macOS Docker mode
         else:
-            _print("  Warning: Docker not found")
-            _print("  Install Docker Desktop for artifact scanning on macOS")
-            _print("  Download: https://www.docker.com/products/docker-desktop")
-            tmas_path = None
+            # Docker not available, offer to install
+            if _install_docker_macos():
+                _print("  Artifact scanning will use Linux TMAS in Docker container")
+                tmas_path = "docker"
+            else:
+                tmas_path = None
     else:
         # Linux/Windows: Install TMAS binary normally
         tmas_path = _install_tmas()
