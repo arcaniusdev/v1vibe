@@ -46,7 +46,7 @@ When the user asks for any security review, check, or scan, complete EVERY step:
 2. **URL CHECK** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain.
 3. **THREAT INTEL** -- Find ALL external IPs, domains, hashes. `check_suspicious_objects` each. `get_threat_indicators` to cross-reference IoC feed.
 4. **IAC SCAN** -- `scan_iac_template` on every CloudFormation/Terraform file. `scan_terraform_archive` for HCL directories.
-5. **CVE CHECK** -- Find dependency files. `get_cve_details` for known CVEs. `list_container_vulnerabilities` if Dockerized.
+5. **CVE CHECK** -- Find dependency files. `get_cve_details` for known CVEs. `get_cve_details` for CVEs in base images.
 6. **AI GUARD** -- ALWAYS run `ai_guard_evaluate` with project summary. NOT optional.
 7. **REPORT** -- Include summary results from ALL invoked capabilities: malware scan results, URL/domain checks, threat intel matches, IaC findings, CVEs, and AI Guard results. Recommend remediation. If anything looks suspicious or uncertain, suggest sandboxing.
 

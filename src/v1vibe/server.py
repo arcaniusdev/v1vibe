@@ -75,7 +75,6 @@ Find ALL CloudFormation files (.yaml, .json, .template) and Terraform files (.tf
 Find dependency files (package.json, requirements.txt, pyproject.toml, go.mod, pom.xml, \
 Cargo.toml, Gemfile, composer.json, etc.) and identify dependencies with known CVEs.
 → Run `get_cve_details` for each known CVE ID.
-→ If the project has a Dockerfile or docker-compose.yml, run `list_container_vulnerabilities`.
 → Report: CVE ID, CVSS score, severity, fix version availability.
 
 ### 6. AI CONTENT VALIDATION — always run this
@@ -370,26 +369,6 @@ async def get_cve_details(
     return await vulnerabilities.get_cve_details(_ctx(ctx), cve_id)
 
 
-@mcp.tool()
-async def list_container_vulnerabilities(
-    ctx: Context,
-    cluster_type: str | None = None,
-    risk_level: str | None = None,
-    top: int = 50,
-) -> dict:
-    """List CVEs found in container images across Kubernetes and ECS clusters.
-
-    Returns vulnerability details including affected packages, CVSS scores,
-    fix versions, and image/registry information.
-
-    Args:
-        cluster_type: Filter by cluster type — one of: kubernetes, amazonEcs.
-        risk_level: Filter by risk level — one of: high, medium, low.
-        top: Maximum results to return.
-    """
-    return await vulnerabilities.list_container_vulnerabilities(_ctx(ctx), cluster_type, risk_level, top)
-
-
 # ═══════════════════════════════════════════════
 # MCP Prompts — workflow templates for AI clients
 # ═══════════════════════════════════════════════
@@ -434,7 +413,6 @@ Find ALL CloudFormation (.yaml, .json, .template) and Terraform (.tf, .tf.json) 
 ## Step 5: DEPENDENCY CVE CHECK — look up every known vulnerability
 Find dependency files and identify packages with known CVEs.
 → Run `get_cve_details` for each CVE.
-→ If Dockerfile exists, run `list_container_vulnerabilities`.
 → Report: CVE ID, CVSS score, severity, fix version.
 
 ## Step 6: AI GUARD — always run this (not optional)
@@ -549,7 +527,7 @@ For any dependencies that are known to have security vulnerabilities, use
 
 ## Step 4: Check container images (if applicable)
 If the project has a Dockerfile or docker-compose.yml, use
-`list_container_vulnerabilities` to check for CVEs in the container images.
+`get_cve_details` to look up specific CVEs found in base images.
 
 ## Step 5: Report
 Summarize all findings:
