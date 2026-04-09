@@ -3,13 +3,13 @@
 A comprehensive security validation MCP server powered by [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Provides AI coding assistants with real-time security scanning across **files, dependencies, containers, infrastructure, URLs, and AI content** — all from within your coding workflow.
 
 **What it does:**
+- 🤖 **AI Safety** — Detect harmful content, PII leakage, and prompt injection
 - 🦠 **Malware Detection** — Scan files and dependencies for trojans, ransomware, spyware
 - 🔍 **Dependency Security** — Find CVEs in 25+ package ecosystems (npm, pip, Maven, Go, Rust, etc.)
 - 🔐 **Secret Scanning** — Detect hardcoded credentials, API keys, tokens in code
 - 🐳 **Container Security** — Scan Docker images and registries for vulnerabilities
 - 🌐 **URL Analysis** — Sandbox and analyze URLs for malicious behavior
 - ☁️ **IaC Security** — Scan CloudFormation and Terraform for misconfigurations
-- 🤖 **AI Safety** — Detect harmful content, PII leakage, and prompt injection
 - 🔎 **Threat Intelligence** — Look up IPs, domains, hashes in global threat feeds
 
 ## Features (12 tools)
