@@ -43,13 +43,14 @@ CLAUDE_MD_SNIPPET = """\
 When the user asks for any security review, check, or scan, complete EVERY step:
 
 1. **MALWARE SCAN** -- `scan_file` on EVERY file in the project. Do not skip any.
-2. **URL CHECK** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain. `sandbox_submit_url` all URLs. Poll and get report.
+2. **URL CHECK** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain.
 3. **THREAT INTEL** -- Find ALL external IPs, domains, hashes. `check_suspicious_objects` each. `get_threat_indicators` to cross-reference IoC feed.
 4. **IAC SCAN** -- `scan_iac_template` on every CloudFormation/Terraform file. `scan_terraform_archive` for HCL directories.
 5. **CVE CHECK** -- Find dependency files. `get_cve_details` for known CVEs. `list_container_vulnerabilities` if Dockerized.
-6. **SANDBOX** -- `sandbox_submit_file` for executables, scripts, JARs, macro docs. Poll and get report.
-7. **AI GUARD** -- ALWAYS run `ai_guard_evaluate` with project summary. NOT optional.
-8. **REPORT** -- Structured findings from ALL steps with remediation recommendations.
+6. **AI GUARD** -- ALWAYS run `ai_guard_evaluate` with project summary. NOT optional.
+7. **REPORT** -- Include summary results from ALL invoked capabilities: malware scan results, URL/domain checks, threat intel matches, IaC findings, CVEs, and AI Guard results. Recommend remediation. If anything looks suspicious or uncertain, suggest sandboxing.
+
+**Sandbox detonation** (`sandbox_submit_file`, `sandbox_submit_url`) is NOT automatic -- only use when the user explicitly asks to sandbox/detonate, or suggest it when scan results are suspicious.
 
 **Do NOT skip steps because they seem unlikely to find something. Clean results are valid results.**
 """

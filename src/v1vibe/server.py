@@ -51,15 +51,12 @@ archives (.zip, .jar, .war), and binaries.
 → Run `scan_file` on EACH file. This is fast (seconds). Do not skip any.
 → Report: total files scanned, any with scanResult != 0.
 
-### 2. URL EXTRACTION & SANDBOX — find and detonate every URL
+### 2. URL CHECK — find and check every URL against threat intelligence
 Search ALL project files for URLs: API endpoints, download links, webhook URLs, \
 dependency sources, CDN links, redirect targets, OAuth endpoints, etc. Look in source \
 code, configs, .env.example, README, package files, Dockerfiles, IaC templates.
-→ Use `check_suspicious_objects` (type "domain") for each unique domain first (instant).
-→ Then submit all unique URLs with `sandbox_submit_url` (up to 10 per call).
-→ Poll each with `sandbox_get_status` until done.
-→ Get results with `sandbox_get_report`.
-→ Report: each URL, where found, risk level.
+→ Use `check_suspicious_objects` (type "domain") for each unique domain (instant).
+→ Report: each URL, where found, any threat intelligence matches.
 
 ### 3. THREAT INTELLIGENCE — check every external reference
 Find ALL external IPs, domains, email addresses, and file hashes in the code and configs.
@@ -81,19 +78,7 @@ Cargo.toml, Gemfile, composer.json, etc.) and identify dependencies with known C
 → If the project has a Dockerfile or docker-compose.yml, run `list_container_vulnerabilities`.
 → Report: CVE ID, CVSS score, severity, fix version availability.
 
-### 6. SANDBOX DETONATION — detonate files with supported extensions
-The sandbox supports these file types: executables (.exe, .dll, .com, .msi, .dmg, .pkg), \
-scripts (.bat, .cmd, .js, .vbs, .ps1, .sh, .py, .hta, .wsf), documents (.doc, .docx, .xls, \
-.xlsx, .ppt, .pptx, .pdf, .rtf, .odt, .ods, .odp, .csv, .xml), Java (.class, .jar), \
-web content (.html, .svg, .mht), archives (.zip, .7z, .rar, .tar, .gz), email (.eml, .msg), \
-and more. Only submit files with supported extensions — the tool will reject unsupported types.
-→ Run `sandbox_submit_file` on each supported file.
-→ Poll with `sandbox_get_status` until done.
-→ Get results with `sandbox_get_report`.
-→ Report: risk level, detections, suspicious objects extracted.
-→ For files with unsupported extensions, rely on `scan_file` results from step 1.
-
-### 7. AI CONTENT VALIDATION — always run this
+### 6. AI CONTENT VALIDATION — always run this
 Run `ai_guard_evaluate` on EVERY security review. Submit a summary of the project's purpose \
 and key code patterns as the prompt. This checks for harmful content, sensitive information \
 leakage (hardcoded credentials, PII, API keys), and prompt injection patterns in the codebase.
@@ -101,19 +86,31 @@ Also check any AI prompts, prompt templates, or system instructions found in the
 → Run `ai_guard_evaluate` at least once per review — this is not optional.
 → Report: Allow/Block action, harmful content categories, PII detected, prompt injection risk.
 
-### 8. REPORT — summarize ALL findings
+### 7. REPORT — summarize ALL findings
 After completing ALL steps above, produce a structured report:
 - Total files scanned and malware detections
-- URLs checked and risk levels
-- Threat intelligence matches
+- URLs checked and threat intelligence matches
+- IoC feed cross-reference results
 - IaC template misconfigurations
 - CVEs found with severity
-- Sandbox detonation results
 - AI content validation results
 - Prioritized remediation recommendations
 
 ## IMPORTANT: Do not skip steps because they seem unlikely to find anything. \
 The whole point is comprehensive coverage. A clean result is a valid result.
+
+## SANDBOX DETONATION — user-initiated, not automatic
+
+The sandbox tools (`sandbox_submit_file`, `sandbox_submit_url`, `sandbox_get_status`, \
+`sandbox_get_report`) are NOT part of the automatic security review checklist. \
+Use them when:
+- The user explicitly asks to sandbox, detonate, or deeply analyze a file or URL
+- A scan_file result or threat intelligence match looks suspicious or uncertain — \
+in this case, SUGGEST sandboxing to the user and proceed if they agree
+
+Supported file types for sandboxing: executables, scripts (.py, .js, .sh, .ps1, .bat, \
+.vbs, etc.), documents (.doc, .pdf, .xls, etc.), Java (.class, .jar), web content, \
+archives, and email. The tool validates extensions and rejects unsupported types.
 """
 
 mcp = FastMCP("v1vibe", instructions=SERVER_INSTRUCTIONS, lifespan=app_lifespan)
@@ -425,27 +422,23 @@ Find dependency files and identify packages with known CVEs.
 → If Dockerfile exists, run `list_container_vulnerabilities`.
 → Report: CVE ID, CVSS score, severity, fix version.
 
-## Step 6: SANDBOX DETONATION — detonate suspicious or executable files
-Identify executables, scripts with complex logic, documents with macros, JARs, binaries.
-→ Run `sandbox_submit_file` on each. Poll and get report.
-→ Report: risk level, detections, suspicious objects.
-
-## Step 7: AI GUARD — always run this (not optional)
+## Step 6: AI GUARD — always run this (not optional)
 Run `ai_guard_evaluate` with a summary of the project's purpose and key code patterns. \
 Also check any AI prompts, templates, or system instructions found in the project.
 → This detects hardcoded credentials, PII, harmful content, and prompt injection.
 → Report: Allow/Block, categories flagged, confidence scores.
 
-## Step 8: FINAL REPORT
+## Step 7: FINAL REPORT
 After completing ALL steps, produce a structured report with:
 - Files scanned and malware detections
 - URLs checked and risk levels
 - Threat intelligence matches
 - IaC misconfigurations
 - CVEs and severity
-- Sandbox results
 - AI Guard results
-- Prioritized remediation recommendations"""
+- Prioritized remediation recommendations
+- If any files or URLs look suspicious or have uncertain disposition, suggest \
+sandboxing them for deeper behavioral analysis"""
 
 
 @mcp.prompt()
