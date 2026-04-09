@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
+import platform
+import re
 import shutil
 import subprocess
 import sys
+import tarfile
+import urllib.request
+import zipfile
 from pathlib import Path
 
 import httpx
 
 from v1vibe.config import (
+    CONFIG_DIR,
     CONFIG_FILE,
     REGION_TO_BASE_URL,
     load_config_file,
@@ -32,6 +39,8 @@ CLAUDE_MD_SNIPPET = """\
 - "sandbox this", "detonate this", "analyze this file"
 - "check this URL", "is this URL safe", "validate this link"
 - "check for vulnerabilities", "any CVEs", "dependency check"
+- "scan dependencies", "check packages", "SBOM", "secret scan"
+- "scan container", "scan image", "check Docker image"
 - "threat check", "look up this hash/IP/domain"
 - "pentest", "harden this", "secure this"
 - "scan this template", "check this CloudFormation/Terraform"
@@ -46,14 +55,18 @@ When the user asks for any security review, check, or scan, complete EVERY step:
 2. **URL CHECK & SANDBOX** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain. Then `sandbox_submit_url` ALL URLs (always). Poll and get report.
 3. **THREAT INTEL** -- Find ALL external IPs, domains, hashes. `check_suspicious_objects` each.
 4. **IAC SCAN** -- `scan_iac_template` on every CloudFormation/Terraform file. `scan_terraform_archive` for HCL directories.
-5. **CVE CHECK** -- Find dependency files. `get_cve_details` for known CVEs.
-6. **AI GUARD** -- ALWAYS run `ai_guard_evaluate` with project summary. NOT optional.
-7. **REPORT** -- Results from ALL steps: malware scan, URL sandbox, threat intel, IaC, CVEs, AI Guard. Recommend remediation. If files look suspicious, suggest sandboxing.
+5. **ARTIFACT SCAN** -- `scan_artifact` on project directory (ALWAYS run unless pure docs/config). Scans for dependency CVEs, malware in packages, and exposed secrets.
+6. **CVE DETAILS** -- `get_cve_details` for specific HIGH/CRITICAL CVEs to get mitigation info.
+7. **AI GUARD** -- ALWAYS run `ai_guard_evaluate` with project summary. NOT optional.
+8. **REPORT** -- Results from ALL steps: malware, URLs, threat intel, IaC, artifacts, CVEs, AI Guard. Recommend remediation.
 
 **URL sandboxing is always automatic.** **File sandboxing is user-initiated** -- only when asked, or suggest when suspicious.
 
 **Do NOT skip steps because they seem unlikely to find something. Clean results are valid results.**
 """
+
+TMAS_BASE_URL = "https://ast-cli.xdr.trendmicro.com/tmas-cli"
+TMAS_BIN_DIR = CONFIG_DIR / "bin"
 
 
 def _print(msg: str = "") -> None:
@@ -69,6 +82,110 @@ def _mask_token(token: str) -> str:
     if len(token) <= 20:
         return "***"
     return token[:10] + "..." + token[-6:]
+
+
+def _get_platform_info() -> tuple[str, str, str]:
+    """Returns (os_name, arch, file_ext) for TMAS binary."""
+    system = platform.system()
+    machine = platform.machine().lower()
+
+    # Map OS
+    if system == "Windows" or system.startswith(("CYGWIN", "MINGW", "MSYS")):
+        os_name = "Windows"
+        ext = "zip"
+    elif system == "Darwin":
+        os_name = "Darwin"
+        ext = "tar.gz"
+    else:  # Linux and others
+        os_name = "Linux"
+        ext = "tar.gz"
+
+    # Map architecture
+    if machine in ("arm64", "aarch64", "armv8", "arm"):
+        arch = "arm64"
+    elif machine in ("x86_64", "amd64"):
+        arch = "x86_64"
+    elif machine in ("i386", "i486", "i586", "i686"):
+        arch = "i386"
+    else:
+        arch = machine  # Pass through
+
+    return os_name, arch, ext
+
+
+def _install_tmas() -> str | None:
+    """Downloads and installs TMAS CLI. Returns path to binary or None on failure."""
+    try:
+        # 1. Fetch metadata
+        metadata_url = f"{TMAS_BASE_URL}/metadata.json"
+        with urllib.request.urlopen(metadata_url, timeout=30) as resp:
+            metadata = json.load(resp)
+
+        version = metadata.get("latestV2")
+        if not version:
+            _print("  Error: Could not determine TMAS version")
+            return None
+
+        # 2. Get platform info
+        os_name, arch, ext = _get_platform_info()
+
+        # 3. Download binary
+        filename = f"tmas-cli_{os_name}_{arch}.{ext}"
+        download_url = f"{TMAS_BASE_URL}/{version}/{filename}"
+
+        TMAS_BIN_DIR.mkdir(parents=True, exist_ok=True)
+        archive_path = TMAS_BIN_DIR / filename
+
+        _print(f"  Downloading TMAS {version}...")
+        urllib.request.urlretrieve(download_url, archive_path)
+
+        # 4. Extract binary
+        binary_name = "tmas.exe" if os_name == "Windows" else "tmas"
+        binary_path = TMAS_BIN_DIR / binary_name
+
+        if ext == "tar.gz":
+            with tarfile.open(archive_path, "r:gz") as tar:
+                # Extract just the tmas binary
+                for member in tar.getmembers():
+                    if member.name.endswith(binary_name):
+                        member.name = binary_name  # Flatten path
+                        tar.extract(member, TMAS_BIN_DIR)
+                        break
+        else:  # zip
+            with zipfile.ZipFile(archive_path, "r") as zip_file:
+                for name in zip_file.namelist():
+                    if name.endswith(binary_name):
+                        # Extract and rename to flatten path
+                        data = zip_file.read(name)
+                        binary_path.write_bytes(data)
+                        break
+
+        # 5. Make executable (Unix-like)
+        if os_name != "Windows":
+            binary_path.chmod(0o755)
+
+        # 6. Clean up archive
+        archive_path.unlink()
+
+        return str(binary_path)
+
+    except Exception as e:
+        _print(f"  Error: {e}")
+        return None
+
+
+def _get_tmas_version(tmas_path: str) -> str | None:
+    """Returns TMAS version string or None."""
+    try:
+        result = subprocess.run(
+            [tmas_path, "version"], capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            # Parse version from output (format varies, just return the line)
+            return result.stdout.strip()
+        return None
+    except Exception:
+        return None
 
 
 async def _test_connectivity(api_token: str, base_url: str) -> dict | None:
@@ -153,22 +270,34 @@ def cmd_setup() -> None:
     quota = asyncio.run(_test_connectivity(api_token, base_url))
     if quota is None:
         _print("  Error: Could not connect to Vision One. Check your token and region.")
-        _print("  Saving config anyway — you can re-run 'v1vibe setup' to fix.")
-        _print()
-    else:
-        remaining = quota.get("submissionRemainingCount", "?")
-        reserve = quota.get("submissionReserveCount", "?")
-        _print(f"  Connected! Sandbox quota: {remaining}/{reserve} submissions remaining.")
-        _print()
+        sys.exit(1)
 
-    # Step 4: Save config
-    _print("Step 4: Saving configuration...")
-    save_config_file(api_token, region)
+    remaining = quota.get("submissionRemainingCount", "?")
+    reserve = quota.get("submissionReserveCount", "?")
+    _print(f"  Connected! Sandbox quota: {remaining}/{reserve} submissions remaining.")
+    _print()
+
+    # Step 4: Install TMAS CLI
+    _print("Step 4: Installing TMAS CLI...")
+    tmas_path = _install_tmas()
+    if tmas_path:
+        _print(f"  Installed: {tmas_path}")
+        # Verify version
+        version = _get_tmas_version(tmas_path)
+        if version:
+            _print(f"  {version}")
+    else:
+        _print("  Warning: TMAS installation failed. Artifact scanning will be unavailable.")
+    _print()
+
+    # Step 5: Save config
+    _print("Step 5: Saving configuration...")
+    save_config_file(api_token, region, tmas_path)
     _print(f"  Saved to {CONFIG_FILE}")
     _print()
 
-    # Step 5: Register with Claude Code
-    _print("Step 5: Claude Code integration")
+    # Step 6: Register with Claude Code
+    _print("Step 6: Claude Code integration")
     claude_path = shutil.which("claude")
     if claude_path:
         register = _input("  Register v1vibe as an MCP server with Claude Code? [Y/n] ").strip().lower()
@@ -216,8 +345,8 @@ def cmd_setup() -> None:
         _print("    claude mcp add --transport stdio --scope user v1vibe -- v1vibe")
         _print()
 
-    # Step 6: CLAUDE.md instructions
-    _print("Step 6: CLAUDE.md instructions")
+    # Step 7: CLAUDE.md instructions
+    _print("Step 7: CLAUDE.md instructions")
     claude_md_path = Path.home() / ".claude" / "CLAUDE.md"
 
     already_has = False
@@ -398,6 +527,20 @@ def cmd_status() -> None:
     else:
         _print("  Could not connect to Vision One")
 
+    # TMAS CLI
+    _print()
+    if settings.tmas_binary_path:
+        tmas_exists = Path(settings.tmas_binary_path).exists()
+        if tmas_exists:
+            version = _get_tmas_version(settings.tmas_binary_path)
+            _print(f"TMAS CLI:    {settings.tmas_binary_path}")
+            if version:
+                _print(f"Version:     {version}")
+        else:
+            _print(f"TMAS CLI:    configured but not found ({settings.tmas_binary_path})")
+    else:
+        _print("TMAS CLI:    not installed (run: v1vibe setup)")
+
     # Claude Code registration
     _print()
     claude_path = shutil.which("claude")
@@ -423,12 +566,84 @@ def cmd_status() -> None:
         _print("CLAUDE.md:   v1vibe instructions not found (run: v1vibe setup)")
 
 
+def cmd_uninstall() -> None:
+    _print("v1vibe uninstall — Remove Configuration and Binaries")
+    _print("=" * 52)
+    _print()
+
+    _print("This will remove:")
+    _print(f"  • Configuration and binaries: {CONFIG_DIR}")
+    _print("  • Claude Code MCP registration")
+    _print("  • v1vibe instructions from ~/.claude/CLAUDE.md")
+    _print()
+    _print("This will NOT remove:")
+    _print("  • The v1vibe Python package (uninstall with: uv tool uninstall v1vibe)")
+    _print()
+
+    confirm = _input("Continue? [y/N] ").strip().lower()
+    if confirm != "y":
+        _print("Cancelled.")
+        return
+
+    _print()
+
+    # 1. Unregister from Claude Code
+    _print("Unregistering from Claude Code...")
+    claude_path = shutil.which("claude")
+    if claude_path:
+        try:
+            result = subprocess.run(
+                [claude_path, "mcp", "remove", "v1vibe"], capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                _print("  Removed MCP registration")
+            else:
+                _print("  Not registered (or already removed)")
+        except Exception as e:
+            _print(f"  Warning: Could not unregister: {e}")
+    else:
+        _print("  Claude Code CLI not found (skipped)")
+
+    # 2. Remove v1vibe section from CLAUDE.md
+    _print("Cleaning ~/.claude/CLAUDE.md...")
+    claude_md_path = Path.home() / ".claude" / "CLAUDE.md"
+    if claude_md_path.exists():
+        content = claude_md_path.read_text()
+        if "## Security Validation with v1vibe" in content:
+            # Remove the v1vibe section (from header to end of snippet)
+            pattern = r"\n## Security Validation with v1vibe.*?(?=\n## |\Z)"
+            cleaned = re.sub(pattern, "", content, flags=re.DOTALL)
+            claude_md_path.write_text(cleaned)
+            _print("  Removed v1vibe instructions")
+        else:
+            _print("  No v1vibe instructions found")
+    else:
+        _print("  File not found (skipped)")
+
+    # 3. Remove config directory and binaries
+    _print(f"Removing {CONFIG_DIR}...")
+    if CONFIG_DIR.exists():
+        shutil.rmtree(CONFIG_DIR)
+        _print("  Removed")
+    else:
+        _print("  Directory not found (skipped)")
+
+    _print()
+    _print("Uninstall complete!")
+    _print()
+    _print("To remove the v1vibe Python package:")
+    _print("  uv tool uninstall v1vibe")
+    _print("  # or: pipx uninstall v1vibe")
+    _print("  # or: pip uninstall v1vibe")
+
+
 def main() -> None:
     args = sys.argv[1:]
 
     if not args:
         # Default: run MCP server
         from v1vibe.server import mcp
+
         mcp.run(transport="stdio")
     elif args[0] == "setup":
         cmd_setup()
@@ -436,15 +651,18 @@ def main() -> None:
         cmd_test()
     elif args[0] == "status":
         cmd_status()
+    elif args[0] == "uninstall":
+        cmd_uninstall()
     elif args[0] in ("-h", "--help", "help"):
         _print("v1vibe — Vision One security validation MCP server")
         _print()
         _print("Commands:")
-        _print("  v1vibe          Start the MCP server (stdio transport)")
-        _print("  v1vibe setup    Interactive setup wizard")
-        _print("  v1vibe test     Smoke test Vision One connectivity")
-        _print("  v1vibe status   Show configuration and health")
-        _print("  v1vibe help     Show this help")
+        _print("  v1vibe            Start the MCP server (stdio transport)")
+        _print("  v1vibe setup      Interactive setup wizard")
+        _print("  v1vibe test       Smoke test Vision One connectivity")
+        _print("  v1vibe status     Show configuration and health")
+        _print("  v1vibe uninstall  Remove configuration and binaries")
+        _print("  v1vibe help       Show this help")
     else:
         _print(f"Unknown command: {args[0]}")
         _print("Run 'v1vibe help' for available commands.")

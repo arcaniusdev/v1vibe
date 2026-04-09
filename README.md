@@ -1,50 +1,114 @@
 # v1vibe
 
-An MCP server that gives AI coding assistants real-time security validation powered by [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Scan files for malware, detonate suspicious files and URLs in a cloud sandbox, look up threat intelligence, and validate AI-generated content — all from within your AI coding workflow.
+A comprehensive security validation MCP server powered by [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Provides AI coding assistants with real-time security scanning across **files, dependencies, containers, infrastructure, URLs, and AI content** — all from within your coding workflow.
 
-## Features (11 tools)
+**What it does:**
+- 🦠 **Malware Detection** — Scan files and dependencies for trojans, ransomware, spyware
+- 🔍 **Dependency Security** — Find CVEs in 25+ package ecosystems (npm, pip, Maven, Go, Rust, etc.)
+- 🔐 **Secret Scanning** — Detect hardcoded credentials, API keys, tokens in code
+- 🐳 **Container Security** — Scan Docker images and registries for vulnerabilities
+- 🌐 **URL Analysis** — Sandbox and analyze URLs for malicious behavior
+- ☁️ **IaC Security** — Scan CloudFormation and Terraform for misconfigurations
+- 🤖 **AI Safety** — Detect harmful content, PII leakage, and prompt injection
+- 🔎 **Threat Intelligence** — Look up IPs, domains, hashes in global threat feeds
 
-### File & Code Security
+## Features (12 tools)
+
+### 🦠 Malware & File Security
 | Tool | What it does |
 |------|-------------|
-| `scan_file` | Fast malware scan via Vision One File Security SDK (seconds) |
-| `sandbox_submit_file` | Submit a file for deep behavioral analysis (sandbox detonation) |
-| `sandbox_submit_url` | Submit up to 10 URLs for sandbox analysis |
+| `scan_file` | Fast malware scan using File Security SDK (seconds per file) |
+| `sandbox_submit_file` | Deep behavioral analysis of files (executables, scripts, documents) |
+| `sandbox_submit_url` | Sandbox analysis for up to 10 URLs (automatic in security reviews) |
 | `sandbox_get_status` | Poll sandbox submission status |
-| `sandbox_get_report` | Get full analysis report with risk level, detections, and suspicious objects |
-| `ai_guard_evaluate` | Check text for harmful content, PII leakage, and prompt injection |
-| `get_submission_quota` | Check remaining daily sandbox submission quota |
+| `sandbox_get_report` | Get full detonation report with risk level, detections, behavioral findings, PDF |
 
-### Threat Intelligence
+### 🔍 Dependency, Container & Secret Scanning (NEW)
 | Tool | What it does |
 |------|-------------|
-| `check_suspicious_objects` | Look up URLs, domains, IPs, or file hashes in threat intelligence |
+| `scan_artifact` | **Comprehensive artifact security:** scans directories, container images, or SBOM files for (1) dependency CVEs in 25+ ecosystems, (2) malware in packages, (3) hardcoded secrets. Generates SBOM automatically. |
 
-### Infrastructure as Code Scanning
+**Supported ecosystems:** npm, pip, Maven, Go, Rust, Ruby, NuGet, PHP Composer, Cargo, Bundler, plus OS packages in Alpine, Debian, Ubuntu, Amazon Linux, Red Hat, etc.
+
+**Supported artifacts:**
+- Project directories (`dir:/path` or just `/path`)
+- Container images (`registry:myrepo/image:tag`, `docker:image:tag`)
+- Archives (`docker-archive:image.tar`, `oci-archive:image.tar`)
+
+### ☁️ Infrastructure as Code Scanning
 | Tool | What it does |
 |------|-------------|
 | `scan_iac_template` | Scan CloudFormation (YAML/JSON) or Terraform plan (JSON) for security misconfigurations |
-| `scan_terraform_archive` | Scan a ZIP of Terraform HCL (.tf) files for security issues |
+| `scan_terraform_archive` | Scan ZIP of Terraform HCL (.tf) files for compliance violations |
 
-### Vulnerabilities
+### 🔎 Threat Intelligence
 | Tool | What it does |
 |------|-------------|
-| `get_cve_details` | Get detailed CVE info with CVSS scores, mitigation options, affected counts |
+| `check_suspicious_objects` | Look up URLs, domains, IPs, email addresses, or file hashes in threat feeds |
+
+### 🛡️ Vulnerabilities
+| Tool | What it does |
+|------|-------------|
+| `get_cve_details` | Get detailed CVE information with CVSS scores, mitigation, affected asset counts |
+
+### 🤖 AI Content Safety
+| Tool | What it does |
+|------|-------------|
+| `ai_guard_evaluate` | Detect harmful content, PII leakage, prompt injection, sensitive data exposure |
+
+### ⚙️ Quota Management
+| Tool | What it does |
+|------|-------------|
+| `get_submission_quota` | Check remaining daily sandbox submission quota (10,000/day default) |
 
 ## Quick Start
 
+### Option 1: Install from source (recommended for now)
+
 ```bash
-pip install v1vibe
+# Clone the repository
+git clone https://github.com/arcaniusdev/v1vibe.git
+cd v1vibe
+
+# Install with uv (recommended)
+uv tool install .
+
+# Or install with pipx
+pipx install .
+
+# Or install with pip
+pip install .
+
+# Run setup
 v1vibe setup
 ```
+
+### Option 2: Install directly from GitHub
+
+```bash
+# With uv (recommended)
+uv tool install git+https://github.com/arcaniusdev/v1vibe.git
+
+# Or with pipx
+pipx install git+https://github.com/arcaniusdev/v1vibe.git
+
+# Or with pip
+pip install git+https://github.com/arcaniusdev/v1vibe.git
+
+# Run setup
+v1vibe setup
+```
+
+> **Note:** The package will be published to PyPI soon. Once published, you'll be able to install with just `uv tool install v1vibe` or `pip install v1vibe`.
 
 That's it. The setup wizard will:
 
 1. Prompt for your Vision One API token and region
 2. Test connectivity
-3. Save config to `~/.v1vibe/config.json`
-4. Register as an MCP server with Claude Code (if installed)
-5. Add CLAUDE.md instructions so Claude proactively uses v1vibe
+3. **Install TMAS CLI** (Trend Micro Artifact Scanner) for dependency/secret/container scanning
+4. Save config to `~/.v1vibe/config.json` (includes TMAS binary path)
+5. Register as an MCP server with Claude Code (if installed)
+6. Add CLAUDE.md instructions so Claude proactively uses v1vibe
 
 After setup, verify everything works:
 
@@ -55,9 +119,24 @@ v1vibe status   # show config, connectivity, and quota
 
 ## Prerequisites
 
-- Python 3.10+
+**System requirements:**
+- Python 3.10 or higher
+- One of: `pip`, `uv`, or `pipx` (for installation)
+- Internet connection (for downloading TMAS CLI during setup)
+
+**Vision One account:**
 - A [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html) account
-- An API key with permissions for: Sandbox Analysis, File Security (Run file scan via SDK), AI Guard, and Threat Intelligence
+- An API key with these permissions:
+  - Sandbox Analysis (Submit object, View/filter/search)
+  - File Security (Run file scan via SDK)
+  - AI Guard (Call detection API)
+  - Threat Intelligence (View)
+  - **Container Security > Run artifacts scan** — for dependency/secret/container scanning
+
+**Python dependencies** (automatically installed):
+- `mcp[cli]>=1.20.0` — MCP server framework
+- `httpx>=0.27.0` — HTTP client for REST API
+- `visionone-filesecurity>=1.4.0` — File Security gRPC SDK
 
 ### Getting your API key
 
@@ -69,25 +148,37 @@ v1vibe status   # show config, connectivity, and quota
    - File Security > Run file scan via SDK
    - AI Application Security > AI Guard > Call detection API
    - Threat Intelligence > Suspicious Object Management (View)
+   - **Container Security > Run artifacts scan** (for TMAS artifact scanning)
 
 ## CLI Commands
 
 | Command | Description |
 |---------|-------------|
 | `v1vibe` | Start the MCP server (stdio transport) |
-| `v1vibe setup` | Interactive setup wizard |
+| `v1vibe setup` | Interactive setup wizard (installs TMAS CLI automatically) |
 | `v1vibe test` | Smoke test Vision One connectivity |
-| `v1vibe status` | Show configuration and health |
+| `v1vibe status` | Show configuration, connectivity, TMAS CLI version, and quota |
+| `v1vibe uninstall` | Remove configuration, binaries, and MCP registration |
 | `v1vibe help` | Show available commands |
 
 ## Configuration
 
-v1vibe reads configuration from (in order of priority):
+v1vibe stores configuration and binaries in `~/.v1vibe/`:
 
+- `config.json` — API token, region, TMAS binary path
+- `bin/tmas` — TMAS CLI binary (auto-installed during setup)
+
+**Configuration priority:**
 1. **Environment variables**: `V1_API_TOKEN` and `V1_REGION`
 2. **Config file**: `~/.v1vibe/config.json` (created by `v1vibe setup`)
 
 **Supported regions:** `us-east-1`, `eu-central-1`, `ap-southeast-1`, `ap-northeast-1`, `ap-southeast-2`, `ap-south-1`, `me-south-1`, `eu-west-2`, `ca-central-1`
+
+**Uninstalling:**
+```bash
+v1vibe uninstall  # Removes config, TMAS binary, MCP registration, CLAUDE.md instructions
+uv tool uninstall v1vibe  # Then remove the Python package
+```
 
 ## Manual Setup
 
@@ -137,6 +228,8 @@ Add the following to your `~/.claude/CLAUDE.md` (global) or project-level `CLAUD
 - "sandbox this", "detonate this", "analyze this file"
 - "check this URL", "is this URL safe", "validate this link"
 - "check for vulnerabilities", "any CVEs", "dependency check"
+- "scan dependencies", "check packages", "SBOM", "secret scan"
+- "scan container", "scan image", "check Docker image"
 - "threat check", "look up this hash/IP/domain"
 - "pentest", "harden this", "secure this"
 - "scan this template", "check this CloudFormation/Terraform"
@@ -148,13 +241,13 @@ Add the following to your `~/.claude/CLAUDE.md` (global) or project-level `CLAUD
 When the user asks for any security review, check, or scan, complete EVERY step:
 
 1. **MALWARE SCAN** -- `scan_file` on EVERY file in the project. Do not skip any.
-2. **URL CHECK** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain. `sandbox_submit_url` all URLs. Poll and get report.
+2. **URL CHECK & SANDBOX** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain. `sandbox_submit_url` all URLs (always). Poll and get report.
 3. **THREAT INTEL** -- Find ALL external IPs, domains, hashes. `check_suspicious_objects` each.
 4. **IAC SCAN** -- `scan_iac_template` on every CloudFormation/Terraform file. `scan_terraform_archive` for HCL directories.
-5. **CVE CHECK** -- Find dependency files. `get_cve_details` for known CVEs. `get_cve_details` for CVEs in base images.
-6. **SANDBOX** -- `sandbox_submit_file` for executables, scripts, JARs, macro docs. Poll and get report.
+5. **ARTIFACT SCAN** -- `scan_artifact` on project directory (ALWAYS run unless pure docs/config). Scans for dependency CVEs, malware in packages, and exposed secrets.
+6. **CVE DETAILS** -- `get_cve_details` for specific HIGH/CRITICAL CVEs to get mitigation info.
 7. **AI GUARD** -- ALWAYS run `ai_guard_evaluate` with project summary. NOT optional.
-8. **REPORT** -- Structured findings from ALL steps with remediation recommendations.
+8. **REPORT** -- Results from ALL steps: malware, URLs, threat intel, IaC, artifacts, CVEs, AI Guard. Recommend remediation.
 
 **Do NOT skip steps because they seem unlikely to find something. Clean results are valid results.**
 ```
@@ -170,14 +263,44 @@ uv sync
 uv run v1vibe test
 ```
 
+### Publishing to PyPI
+
+To publish v1vibe to PyPI (requires PyPI account and credentials):
+
+```bash
+# Build the package
+uv build
+
+# Upload to TestPyPI first (optional but recommended)
+uv publish --index-url https://test.pypi.org/legacy/ --username __token__ --password <test-pypi-token>
+
+# Test installation from TestPyPI
+pip install --index-url https://test.pypi.org/simple/ v1vibe
+
+# Upload to production PyPI
+uv publish --username __token__ --password <pypi-token>
+```
+
+**Prerequisites for publishing:**
+- PyPI account at https://pypi.org
+- API token from PyPI (Settings > API tokens)
+- Update version in `pyproject.toml` for each release
+
 ### Architecture
 
-- `src/v1vibe/cli.py` — CLI entry point: setup wizard, test, status commands
-- `src/v1vibe/server.py` — FastMCP server with tool registrations
-- `src/v1vibe/config.py` — Settings, region mapping, config file I/O
+- `src/v1vibe/cli.py` — CLI entry point: setup wizard (with TMAS install), test, status, uninstall
+- `src/v1vibe/server.py` — FastMCP server with 12 tools + 4 prompts
+- `src/v1vibe/config.py` — Settings, region mapping, config file I/O (includes TMAS path)
 - `src/v1vibe/clients.py` — gRPC + httpx client lifecycle (lifespan context)
 - `src/v1vibe/utils.py` — Error formatting, response helpers
-- `src/v1vibe/tools/` — One module per tool group (file_security, sandbox, ai_guard, threat_intel)
+- `src/v1vibe/tools/` — Tool implementations:
+  - `file_security.py` — File malware scanning (gRPC SDK)
+  - `sandbox.py` — File/URL sandbox analysis (REST v3.0)
+  - `artifact_scanner.py` — **NEW:** Dependency/secret/container scanning (TMAS CLI wrapper)
+  - `ai_guard.py` — AI content safety (REST v3.0)
+  - `threat_intel.py` — Suspicious object lookup (REST v3.0)
+  - `iac_scanner.py` — Infrastructure security (REST beta)
+  - `vulnerabilities.py` — CVE details (REST v3.0)
 
 ## License
 

@@ -5,6 +5,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from v1vibe.clients import AppContext, app_lifespan
 from v1vibe.tools import (
     ai_guard,
+    artifact_scanner,
     file_security,
     iac_scanner,
     sandbox,
@@ -29,10 +30,13 @@ Use v1vibe when the user says ANY of the following (or anything similar):
 - "sandbox this", "detonate this", "analyze this file"
 - "check this URL", "is this URL safe", "validate this link"
 - "check for vulnerabilities", "any CVEs", "vulnerability scan", "dependency check"
+- "scan dependencies", "check my packages", "SBOM", "software bill of materials"
+- "secret scan", "find secrets", "check for credentials", "hardcoded passwords"
+- "scan container", "scan image", "check Docker image", "registry scan"
 - "threat check", "threat assessment", "look up this hash/IP/domain"
 - "pentest", "harden this", "secure this"
 - "scan this template", "check this CloudFormation", "check this Terraform", "IaC scan"
-- "Vision One", "v1vibe"
+- "Vision One", "v1vibe", "TMAS", "artifact scanner"
 
 **Default behavior**: When the user asks you to "review" a project and the context is \
 security (not just code style or functionality), use v1vibe and run the full checklist. \
@@ -73,13 +77,31 @@ Find ALL CloudFormation files (.yaml, .json, .template) and Terraform files (.tf
 → For Terraform HCL directories: ZIP the .tf files and run `scan_terraform_archive`.
 → Report: all findings with status FAILURE, grouped by risk level.
 
-### 5. DEPENDENCY CVE CHECK — look up every known vulnerability
+### 5. ARTIFACT SCAN — scan for vulnerabilities, malware, and secrets (ALWAYS RUN)
+**ALWAYS run this on every project with code dependencies or container images.** Use TMAS to scan for:
+- **Vulnerabilities**: Open-source package CVEs in 25+ ecosystems (npm, pip, Maven, Go, Rust, Ruby, PHP, etc.)
+- **Malware**: Trojans, ransomware, spyware in dependencies and artifacts
+- **Secrets**: Hardcoded credentials, API keys, tokens, passwords in code
+
+**When to run:**
+- ANY project with package files (package.json, requirements.txt, go.mod, pom.xml, Cargo.toml, etc.)
+- Container images or Dockerfiles
+- ANY codebase where secrets could be hardcoded
+- In other words: **ALWAYS run this unless it's a pure config/documentation repo**
+
+→ Run `scan_artifact` with artifact path = project root directory
+→ Default scan types: ["vulnerability", "secrets"] — add "malware" for untrusted sources
+→ Report: CVEs with CVSS scores, malware detections, exposed secrets with file locations
+→ This generates an SBOM and provides comprehensive supply chain security analysis
+
+### 6. DEPENDENCY CVE CHECK — look up specific known vulnerabilities
 Find dependency files (package.json, requirements.txt, pyproject.toml, go.mod, pom.xml, \
 Cargo.toml, Gemfile, composer.json, etc.) and identify dependencies with known CVEs.
-→ Run `get_cve_details` for each known CVE ID.
+→ Run `get_cve_details` for each known CVE ID to get detailed mitigation info.
 → Report: CVE ID, CVSS score, severity, fix version availability.
+→ NOTE: `scan_artifact` provides broader CVE coverage; use this for deep-dive on specific CVEs.
 
-### 6. AI CONTENT VALIDATION — always run this
+### 7. AI CONTENT VALIDATION — always run this
 Run `ai_guard_evaluate` on EVERY security review. Submit a summary of the project's purpose \
 and key code patterns as the prompt. This checks for harmful content, sensitive information \
 leakage (hardcoded credentials, PII, API keys), and prompt injection patterns in the codebase.
@@ -87,13 +109,14 @@ Also check any AI prompts, prompt templates, or system instructions found in the
 → Run `ai_guard_evaluate` at least once per review — this is not optional.
 → Report: Allow/Block action, harmful content categories, PII detected, prompt injection risk.
 
-### 7. REPORT — summarize ALL findings
+### 8. REPORT — summarize ALL findings
 After completing ALL steps above, produce a structured report:
 - Total files scanned and malware detections
 - URLs checked: suspicious object matches and sandbox risk levels
 - Threat intelligence matches for IPs, domains, hashes
 - IaC template misconfigurations
-- CVEs found with severity
+- Artifact scan results: dependency CVEs, malware in packages, exposed secrets
+- Specific CVE details from get_cve_details
 - AI Guard results (Allow/Block, categories, PII, prompt injection)
 - Prioritized remediation recommendations
 
@@ -350,6 +373,43 @@ async def get_cve_details(
     return await vulnerabilities.get_cve_details(_ctx(ctx), cve_id)
 
 
+@mcp.tool()
+async def scan_artifact(
+    ctx: Context,
+    artifact: str,
+    scan_types: list[str] | None = None,
+    additional_args: str | None = None,
+) -> dict:
+    """Scans artifact using TMAS CLI for vulnerabilities, malware, and secrets.
+
+    Generates SBOM for vulnerability scanning, detects malware in dependencies,
+    and finds exposed credentials. Supports 25+ package ecosystems including
+    npm, pip, Maven, Go, Rust, NuGet, Ruby, and container images.
+
+    Use when:
+    - Scanning project directories for dependency vulnerabilities and secrets
+    - Analyzing container images for CVEs before deployment
+    - Checking for hardcoded credentials, API keys, tokens in code
+    - Generating SBOM for compliance and supply chain security
+
+    Supported artifacts:
+    - Directories: "dir:/path/to/project" or just "/path/to/project"
+    - Container images: "registry:myrepo/image:tag", "docker:image:tag"
+    - Archives: "docker-archive:image.tar", "oci-archive:image.tar"
+
+    Args:
+        artifact: Path to artifact (directory, image reference, or archive).
+        scan_types: Scan types to run. Options: "vulnerability", "malware", "secrets".
+                   Default: ["vulnerability", "secrets"]
+        additional_args: Extra CLI arguments (e.g., "--region us-east-1").
+
+    Returns:
+        Scan results including CVEs with CVSS scores, malware detections,
+        and exposed secrets with file locations.
+    """
+    return await artifact_scanner.scan_artifact(_ctx(ctx), artifact, scan_types, additional_args)
+
+
 # ═══════════════════════════════════════════════
 # MCP Prompts — workflow templates for AI clients
 # ═══════════════════════════════════════════════
@@ -365,7 +425,7 @@ def security_review(project_path: str = ".") -> str:
     """
     return f"""Perform a COMPREHENSIVE security review of the project at: {project_path}
 
-IMPORTANT: You MUST complete ALL 8 steps below. Do NOT skip any step. Do NOT stop early. \
+IMPORTANT: You MUST complete ALL 9 steps below. Do NOT skip any step. Do NOT stop early. \
 Each step covers a different attack surface. A step returning clean results is expected — \
 report it and move to the next step.
 
@@ -391,24 +451,38 @@ Find ALL CloudFormation (.yaml, .json, .template) and Terraform (.tf, .tf.json) 
 → Run `scan_iac_template` or `scan_terraform_archive` as appropriate.
 → Report: all FAILURE findings grouped by risk level.
 
-## Step 5: DEPENDENCY CVE CHECK — look up every known vulnerability
-Find dependency files and identify packages with known CVEs.
-→ Run `get_cve_details` for each CVE.
-→ Report: CVE ID, CVSS score, severity, fix version.
+## Step 5: ARTIFACT SCAN — scan for dependency vulnerabilities, malware, and secrets
+**ALWAYS run this step** unless the project contains only documentation/configs with no code.
+Use `scan_artifact` to scan the project directory for:
+- Dependency vulnerabilities (CVEs in 25+ ecosystems: npm, pip, Maven, Go, Rust, Ruby, PHP, NuGet, etc.)
+- Malware in dependencies and packages (supply chain attacks)
+- Exposed secrets (hardcoded credentials, API keys, tokens, passwords)
+→ Run `scan_artifact` with artifact="{project_path}", scan_types=["vulnerability", "secrets"]
+→ Add "malware" to scan_types if project has untrusted dependencies or is from unknown source
+→ This generates an SBOM and provides comprehensive dependency security analysis
+→ Report: All CVEs with CVSS scores, malware in packages, secrets with file locations and severity
 
-## Step 6: AI GUARD — always run this (not optional)
+## Step 6: SPECIFIC CVE DETAILS — look up critical vulnerabilities
+For any HIGH or CRITICAL CVEs found in step 5, use `get_cve_details` to get:
+- Detailed mitigation options
+- Patch availability
+- Affected asset counts
+→ Report: CVE ID, CVSS score, severity, fix version, remediation steps.
+
+## Step 7: AI GUARD — always run this (not optional)
 Run `ai_guard_evaluate` with a summary of the project's purpose and key code patterns. \
 Also check any AI prompts, templates, or system instructions found in the project.
 → This detects hardcoded credentials, PII, harmful content, and prompt injection.
 → Report: Allow/Block, categories flagged, confidence scores.
 
-## Step 7: FINAL REPORT
+## Step 8: FINAL REPORT
 After completing ALL steps, produce a structured report with:
 - Files scanned and malware detections
 - URLs checked and risk levels
 - Threat intelligence matches
 - IaC misconfigurations
-- CVEs and severity
+- Artifact scan results: dependency CVEs, malware in packages, exposed secrets
+- Specific CVE details for critical vulnerabilities
 - AI Guard results
 - Prioritized remediation recommendations
 - If any files or URLs look suspicious or have uncertain disposition, suggest \
