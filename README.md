@@ -99,9 +99,7 @@ pip install git+https://github.com/arcaniusdev/v1vibe.git
 v1vibe setup
 ```
 
-> **Note:** The package will be published to PyPI soon. Once published, you'll be able to install with just `uv tool install v1vibe` or `pip install v1vibe`.
-
-That's it. The setup wizard will:
+The setup wizard will:
 
 1. Prompt for your Vision One API token and region
 2. Test connectivity
@@ -263,30 +261,7 @@ uv sync
 uv run v1vibe test
 ```
 
-### Publishing to PyPI
-
-To publish v1vibe to PyPI (requires PyPI account and credentials):
-
-```bash
-# Build the package
-uv build
-
-# Upload to TestPyPI first (optional but recommended)
-uv publish --index-url https://test.pypi.org/legacy/ --username __token__ --password <test-pypi-token>
-
-# Test installation from TestPyPI
-pip install --index-url https://test.pypi.org/simple/ v1vibe
-
-# Upload to production PyPI
-uv publish --username __token__ --password <pypi-token>
-```
-
-**Prerequisites for publishing:**
-- PyPI account at https://pypi.org
-- API token from PyPI (Settings > API tokens)
-- Update version in `pyproject.toml` for each release
-
-### Architecture
+## Architecture
 
 - `src/v1vibe/cli.py` — CLI entry point: setup wizard (with TMAS install), test, status, uninstall
 - `src/v1vibe/server.py` — FastMCP server with 12 tools + 4 prompts
