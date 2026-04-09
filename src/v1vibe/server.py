@@ -13,90 +13,90 @@ from v1vibe.tools import (
 )
 
 SERVER_INSTRUCTIONS = """\
-v1vibe is your security validation toolkit. It connects to Trend Micro Vision One to scan \
-files for malware, detonate suspicious files and URLs in a cloud sandbox, look up threat \
-intelligence, check for CVEs, and validate AI-generated content.
+v1vibe validates the security of code, files, and infrastructure using Trend Micro Vision One.
 
-## WHEN TO USE v1vibe — TRIGGER PHRASES
+## WHEN TO USE v1vibe
 
-You MUST use v1vibe tools when the user says ANY of the following (or similar):
-- "security review", "security check", "security scan", "security audit"
-- "is this safe", "is this malicious", "is this suspicious"
-- "check for malware", "scan for threats", "scan this file", "scan this project"
-- "sandbox this", "detonate this", "analyze this file"
-- "check this URL", "is this URL safe", "validate this link"
-- "check for vulnerabilities", "any CVEs", "vulnerability scan"
-- "threat check", "threat assessment", "look up this hash/IP/domain"
-- "review this code for security", "pentest", "harden this"
-- "scan this template", "check this CloudFormation", "check this Terraform", "IaC scan"
+You MUST use v1vibe when the user mentions ANYTHING security-related:
+"security review", "security check", "scan", "safe", "malicious", "suspicious", \
+"malware", "sandbox", "detonate", "URL safe", "vulnerability", "CVE", "threat", \
+"pentest", "harden", "CloudFormation", "Terraform", "IaC", "check this project", \
+"Vision One", or similar.
 
-When in doubt, USE v1vibe. It is always better to scan and find nothing than to skip scanning.
+When in doubt, USE v1vibe. Scanning and finding nothing is always better than skipping.
 
-## SECURITY REVIEW PLAYBOOK
+## MANDATORY CHECKLIST — Do ALL of these, not just some
 
-When the user asks for a "security review" or similar broad request, follow this playbook:
+When the user asks for any kind of security review, check, or scan, you MUST complete \
+EVERY applicable step below. Do NOT skip steps. Do NOT stop after the first few. \
+Each step targets a different attack surface — skipping any one leaves a gap.
 
-### Step 1: Scan all code files for malware
-Use `scan_file` on every source code file, script, binary, and document in the project. \
-This is fast (seconds per file). Report any detections.
+### 1. MALWARE SCAN — scan every file
+Find ALL files in the project: source code (.py, .js, .ts, .java, .go, .rs, .c, .rb, .php, etc.), \
+scripts (.sh, .ps1, .bat), configs (.json, .yaml, .toml, .xml), documents (.pdf, .doc, .xls), \
+archives (.zip, .jar, .war), and binaries.
+→ Run `scan_file` on EACH file. This is fast (seconds). Do not skip any.
+→ Report: total files scanned, any with scanResult != 0.
 
-### Step 2: Extract and check URLs
-Find all URLs in the code (imports, API endpoints, download links, webhook URLs, config files). \
-Use `sandbox_submit_url` to submit them, then poll with `sandbox_get_status` and retrieve \
-results with `sandbox_get_report`.
+### 2. URL EXTRACTION & SANDBOX — find and detonate every URL
+Search ALL project files for URLs: API endpoints, download links, webhook URLs, \
+dependency sources, CDN links, redirect targets, OAuth endpoints, etc. Look in source \
+code, configs, .env.example, README, package files, Dockerfiles, IaC templates.
+→ Use `check_suspicious_objects` (type "domain") for each unique domain first (instant).
+→ Then submit all unique URLs with `sandbox_submit_url` (up to 10 per call).
+→ Poll each with `sandbox_get_status` until done.
+→ Get results with `sandbox_get_report`.
+→ Report: each URL, where found, risk level.
 
-### Step 3: Check external dependencies
-For any external IPs, domains, or file hashes referenced in the code, use \
-`check_suspicious_objects` to look them up in threat intelligence.
+### 3. THREAT INTELLIGENCE — check every external reference
+Find ALL external IPs, domains, email addresses, and file hashes in the code and configs.
+→ Run `check_suspicious_objects` for each one.
+→ Run `get_threat_indicators` to pull the IoC feed and cross-reference against project artifacts.
+→ Report: any matches with risk level and recommended action.
 
-### Step 4: Scan IaC templates
-If the project contains CloudFormation templates (YAML/JSON) or Terraform configurations, \
-use `scan_iac_template` on each template file. For Terraform HCL projects with multiple .tf \
-files, ZIP them and use `scan_terraform_archive`. Report any FAILURE findings, especially \
-HIGH/VERY_HIGH/EXTREME risk levels.
+### 4. IAC TEMPLATE SCAN — scan every infrastructure template
+Find ALL CloudFormation files (.yaml, .json, .template) and Terraform files (.tf, .tf.json).
+→ For CloudFormation: run `scan_iac_template` with type "cloudformation-template" on each.
+→ For Terraform plan JSON: run `scan_iac_template` with type "terraform-template".
+→ For Terraform HCL directories: ZIP the .tf files and run `scan_terraform_archive`.
+→ Report: all findings with status FAILURE, grouped by risk level.
 
-### Step 5: Check known CVEs
-If the project uses libraries or frameworks with known CVEs, use `get_cve_details` to \
-look up the specific CVE and assess severity. For containerized projects, use \
-`list_container_vulnerabilities` to scan container images.
+### 5. DEPENDENCY CVE CHECK — look up every known vulnerability
+Find dependency files (package.json, requirements.txt, pyproject.toml, go.mod, pom.xml, \
+Cargo.toml, Gemfile, composer.json, etc.) and identify dependencies with known CVEs.
+→ Run `get_cve_details` for each known CVE ID.
+→ If the project has a Dockerfile or docker-compose.yml, run `list_container_vulnerabilities`.
+→ Report: CVE ID, CVSS score, severity, fix version availability.
 
-### Step 5: Deep analysis (if warranted)
-For any files that seem suspicious or high-risk (executables, scripts with obfuscated code, \
-documents with macros), use `sandbox_submit_file` for full behavioral detonation. Poll with \
-`sandbox_get_status` and get results with `sandbox_get_report`.
+### 6. SANDBOX DETONATION — detonate suspicious or executable files
+Identify files that benefit from behavioral analysis: executables, scripts with complex logic, \
+documents with macros, JARs, compiled binaries, anything flagged in step 1.
+→ Run `sandbox_submit_file` on each.
+→ Poll with `sandbox_get_status` until done.
+→ Get results with `sandbox_get_report`.
+→ Report: risk level, detections, suspicious objects extracted.
 
-### Step 6: AI content validation
-Use `ai_guard_evaluate` to check any AI-generated prompts or outputs for harmful content, \
-sensitive information leakage, or prompt injection patterns.
+### 7. AI CONTENT VALIDATION — always run this
+Run `ai_guard_evaluate` on EVERY security review. Submit a summary of the project's purpose \
+and key code patterns as the prompt. This checks for harmful content, sensitive information \
+leakage (hardcoded credentials, PII, API keys), and prompt injection patterns in the codebase.
+Also check any AI prompts, prompt templates, or system instructions found in the project.
+→ Run `ai_guard_evaluate` at least once per review — this is not optional.
+→ Report: Allow/Block action, harmful content categories, PII detected, prompt injection risk.
 
-### Step 7: Report findings
-Summarize all scan results, detections, suspicious objects, and CVEs found. Recommend \
-remediation steps for any issues.
+### 8. REPORT — summarize ALL findings
+After completing ALL steps above, produce a structured report:
+- Total files scanned and malware detections
+- URLs checked and risk levels
+- Threat intelligence matches
+- IaC template misconfigurations
+- CVEs found with severity
+- Sandbox detonation results
+- AI content validation results
+- Prioritized remediation recommendations
 
-## TOOL REFERENCE
-
-### Scanning & Sandbox
-- **scan_file**: Fast malware scan (seconds). First-line check for any file.
-- **sandbox_submit_file**: Deep behavioral detonation. Returns task ID to poll.
-- **sandbox_submit_url**: Submit up to 10 URLs for analysis. Returns per-URL task IDs.
-- **sandbox_get_status**: Poll submission status (running/succeeded/failed).
-- **sandbox_get_report**: Get full report: risk level, detections, suspicious objects.
-- **get_submission_quota**: Check remaining daily sandbox quota.
-
-### Threat Intelligence
-- **check_suspicious_objects**: Look up URLs, domains, IPs, file hashes, emails.
-- **get_threat_indicators**: Pull IoC feed (STIX 2.1) to cross-reference against project files.
-
-### Infrastructure as Code Scanning
-- **scan_iac_template**: Scan CloudFormation (YAML/JSON) or Terraform plan (JSON) templates.
-- **scan_terraform_archive**: Scan a ZIP of Terraform HCL (.tf) files.
-
-### Vulnerabilities
-- **get_cve_details**: Detailed CVE info with CVSS, mitigation, affected counts.
-- **list_container_vulnerabilities**: CVEs in container images with fix versions.
-
-### AI Content Safety
-- **ai_guard_evaluate**: Check text for harmful content, PII leaks, prompt injection.
+## IMPORTANT: Do not skip steps because they seem unlikely to find anything. \
+The whole point is comprehensive coverage. A clean result is a valid result.
 """
 
 mcp = FastMCP("v1vibe", instructions=SERVER_INSTRUCTIONS, lifespan=app_lifespan)
@@ -366,56 +366,61 @@ def security_review(project_path: str = ".") -> str:
     check URLs found in code, look up dependencies in threat intelligence,
     check for known CVEs, and validate AI-generated content.
     """
-    return f"""Perform a comprehensive security review of the project at: {project_path}
+    return f"""Perform a COMPREHENSIVE security review of the project at: {project_path}
 
-Follow these steps using v1vibe tools:
+IMPORTANT: You MUST complete ALL 8 steps below. Do NOT skip any step. Do NOT stop early. \
+Each step covers a different attack surface. A step returning clean results is expected — \
+report it and move to the next step.
 
-## Step 1: Scan all code files for malware
-Find every source file, script, config, and binary in the project.
-Use `scan_file` on each one. This is fast — do them all.
-Report any file where scanResult is non-zero (malware detected).
+## Step 1: MALWARE SCAN — scan every file
+Find ALL files in the project. Use `scan_file` on EACH one. Do not skip any.
+→ Report: total files scanned, any with scanResult != 0.
 
-## Step 2: Extract and check all URLs
-Search the codebase for URLs — in imports, configs, API calls, comments, README, package files.
-Collect all unique URLs and submit them with `sandbox_submit_url` (up to 10 at a time).
-Poll each with `sandbox_get_status` until complete, then get results with `sandbox_get_report`.
-Flag any URLs with risk level medium or higher.
+## Step 2: URL EXTRACTION & SANDBOX — find and check every URL
+Search ALL project files for URLs (API endpoints, download links, webhooks, CDN, OAuth, etc.).
+→ Use `check_suspicious_objects` (type "domain") for each unique domain.
+→ Submit all unique URLs with `sandbox_submit_url` (up to 10 per call).
+→ Poll with `sandbox_get_status`, get results with `sandbox_get_report`.
+→ Report: each URL, where found, risk level.
 
-## Step 3: Check external resources in threat intelligence
-For any external domains, IP addresses, or file hashes referenced in the code:
-Use `check_suspicious_objects` to look each one up.
-Report any matches with their risk level.
+## Step 3: THREAT INTELLIGENCE — check every external reference
+Find ALL external IPs, domains, email addresses, and file hashes in code and configs.
+→ Run `check_suspicious_objects` for each.
+→ Run `get_threat_indicators` and cross-reference IoCs against project artifacts.
+→ Report: any matches with risk level.
 
-## Step 4: Scan IaC templates
-If the project contains CloudFormation templates (.yaml, .json, .template) or Terraform files
-(.tf, .tf.json), scan them for security misconfigurations:
-- For individual CloudFormation or Terraform plan JSON files: use `scan_iac_template`
-- For Terraform HCL projects with multiple .tf files: ZIP them and use `scan_terraform_archive`
-Report any findings with status FAILURE, especially HIGH/VERY_HIGH/EXTREME risk levels.
+## Step 4: IAC TEMPLATE SCAN — scan every infrastructure template
+Find ALL CloudFormation (.yaml, .json, .template) and Terraform (.tf, .tf.json) files.
+→ Run `scan_iac_template` or `scan_terraform_archive` as appropriate.
+→ Report: all FAILURE findings grouped by risk level.
 
-## Step 5: Check for known CVEs in dependencies
-Review the project's dependency files (package.json, requirements.txt, pom.xml, go.mod, etc.).
-For any dependencies with known security issues, use `get_cve_details` to look up the CVE.
-For containerized projects, use `list_container_vulnerabilities` to check container images.
+## Step 5: DEPENDENCY CVE CHECK — look up every known vulnerability
+Find dependency files and identify packages with known CVEs.
+→ Run `get_cve_details` for each CVE.
+→ If Dockerfile exists, run `list_container_vulnerabilities`.
+→ Report: CVE ID, CVSS score, severity, fix version.
 
-## Step 6: Deep sandbox analysis (if needed)
-If any files look suspicious (obfuscated code, unusual binaries, macro-enabled documents),
-submit them with `sandbox_submit_file` for full behavioral detonation.
-Poll with `sandbox_get_status` and retrieve with `sandbox_get_report`.
+## Step 6: SANDBOX DETONATION — detonate suspicious or executable files
+Identify executables, scripts with complex logic, documents with macros, JARs, binaries.
+→ Run `sandbox_submit_file` on each. Poll and get report.
+→ Report: risk level, detections, suspicious objects.
 
-## Step 7: AI content validation
-If the project contains AI prompts, templates, or generated content,
-use `ai_guard_evaluate` to check for harmful content, PII leakage, or prompt injection.
+## Step 7: AI GUARD — always run this (not optional)
+Run `ai_guard_evaluate` with a summary of the project's purpose and key code patterns. \
+Also check any AI prompts, templates, or system instructions found in the project.
+→ This detects hardcoded credentials, PII, harmful content, and prompt injection.
+→ Report: Allow/Block, categories flagged, confidence scores.
 
-## Step 8: Report
-Summarize all findings in a clear report:
-- Files scanned and results
-- URLs checked and any flagged
+## Step 8: FINAL REPORT
+After completing ALL steps, produce a structured report with:
+- Files scanned and malware detections
+- URLs checked and risk levels
 - Threat intelligence matches
-- IaC template scan findings (misconfigurations, compliance violations)
-- CVEs found and severity
-- Sandbox detonation results
-- Recommendations for remediation"""
+- IaC misconfigurations
+- CVEs and severity
+- Sandbox results
+- AI Guard results
+- Prioritized remediation recommendations"""
 
 
 @mcp.prompt()

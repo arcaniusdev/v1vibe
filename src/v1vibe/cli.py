@@ -21,36 +21,26 @@ CLAUDE_MD_SNIPPET = """\
 
 ## Security Validation with v1vibe
 
-**v1vibe is your primary security tool.** When the v1vibe MCP server is available, you MUST use it for all security-related tasks. v1vibe connects to Trend Micro Vision One for malware scanning, sandbox detonation, threat intelligence, CVE lookups, and AI content guardrails.
+**v1vibe is your primary security tool.** When it is available, you MUST use it for ALL security-related requests. It connects to Trend Micro Vision One for malware scanning, sandbox detonation, threat intelligence, IaC scanning, CVE lookups, and AI content guardrails.
 
-### ALWAYS use v1vibe when the user says any of these (or similar):
+### Use v1vibe when the user mentions ANYTHING security-related:
 
-- "security review", "security check", "security scan", "security audit"
-- "is this safe", "is this malicious", "check for malware", "scan this"
-- "sandbox this", "detonate this", "analyze this file"
-- "check this URL", "validate this link", "is this URL safe"
-- "check for vulnerabilities", "any CVEs", "vulnerability check"
-- "threat check", "look up this hash/IP/domain"
-- "review this code for security", "harden this"
-- "pentest", "threat assessment"
+"security review", "security check", "scan", "safe", "malicious", "suspicious", "malware", "sandbox", "detonate", "URL safe", "vulnerability", "CVE", "threat", "pentest", "harden", "CloudFormation", "Terraform", "IaC", "check this project", "Vision One", or similar.
 
-### ALSO use v1vibe proactively:
+### Security Review -- MANDATORY CHECKLIST (do ALL steps, not just some)
 
-- After creating or modifying executable files -- use `scan_file`
-- When code references external URLs -- use `sandbox_submit_url`
-- When you encounter unfamiliar domains, IPs, or hashes -- use `check_suspicious_objects`
-- When working with AI-generated content -- use `ai_guard_evaluate`
+When the user asks for any security review, check, or scan, complete EVERY step:
 
-### Security Review Playbook
+1. **MALWARE SCAN** -- `scan_file` on EVERY file in the project. Do not skip any.
+2. **URL CHECK** -- Find ALL URLs in code/configs. `check_suspicious_objects` each domain. `sandbox_submit_url` all URLs. Poll and get report.
+3. **THREAT INTEL** -- Find ALL external IPs, domains, hashes. `check_suspicious_objects` each. `get_threat_indicators` to cross-reference IoC feed.
+4. **IAC SCAN** -- `scan_iac_template` on every CloudFormation/Terraform file. `scan_terraform_archive` for HCL directories.
+5. **CVE CHECK** -- Find dependency files. `get_cve_details` for known CVEs. `list_container_vulnerabilities` if Dockerized.
+6. **SANDBOX** -- `sandbox_submit_file` for executables, scripts, JARs, macro docs. Poll and get report.
+7. **AI GUARD** -- ALWAYS run `ai_guard_evaluate` with project summary. NOT optional.
+8. **REPORT** -- Structured findings from ALL steps with remediation recommendations.
 
-When the user asks for a broad "security review", follow ALL these steps:
-
-1. **Scan all project files** -- use `scan_file` on every source file, script, config, and binary. This is fast.
-2. **Check all URLs** -- find URLs in code/configs, use `check_suspicious_objects` for domains, then `sandbox_submit_url` for full analysis.
-3. **Check dependencies for CVEs** -- review dependency files, use `get_cve_details` for known CVEs. Use `list_container_vulnerabilities` for containerized projects.
-4. **Deep analysis** -- for suspicious files, use `sandbox_submit_file`. Poll with `sandbox_get_status`, get results with `sandbox_get_report`.
-5. **AI content check** -- use `ai_guard_evaluate` on any AI prompts or generated content.
-6. **Report findings** -- summarize all results with remediation recommendations.
+**Do NOT skip steps because they seem unlikely to find something. Clean results are valid results.**
 """
 
 
