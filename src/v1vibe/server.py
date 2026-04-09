@@ -5,14 +5,11 @@ from mcp.server.fastmcp import Context, FastMCP
 from v1vibe.clients import AppContext, app_lifespan
 from v1vibe.tools import (
     ai_guard,
-    endpoint,
     file_security,
     iac_scanner,
     sandbox,
-    search,
     threat_intel,
     vulnerabilities,
-    yara_rules,
 )
 
 SERVER_INSTRUCTIONS = """\
@@ -88,19 +85,10 @@ remediation steps for any issues.
 
 ### Threat Intelligence
 - **check_suspicious_objects**: Look up URLs, domains, IPs, file hashes, emails.
-- **get_threat_indicators**: Get IoCs (STIX 2.1) from threat feeds.
-- **get_threat_reports**: Get intelligence reports by location/industry.
-
-### Detection & Response
-- **search_detections**: Query detection logs (40+ fields, 10K results).
-- **list_alerts**: List workbench alerts by status/severity.
-- **start_malware_scan**: Trigger remote endpoint malware scan.
-- **list_yara_rules / run_yara_rules**: Manage and execute YARA rules on endpoints.
+- **get_threat_indicators**: Pull IoC feed (STIX 2.1) to cross-reference against project files.
 
 ### Infrastructure as Code Scanning
-- **scan_iac_template**: Scan a CloudFormation (YAML/JSON) or Terraform plan (JSON) template \
-for security misconfigurations, compliance violations, and best practice issues. Use whenever \
-you create or modify IaC templates.
+- **scan_iac_template**: Scan CloudFormation (YAML/JSON) or Terraform plan (JSON) templates.
 - **scan_terraform_archive**: Scan a ZIP of Terraform HCL (.tf) files.
 
 ### Vulnerabilities
@@ -262,46 +250,7 @@ async def get_submission_quota(ctx: Context) -> dict:
     return await sandbox.get_submission_quota(_ctx(ctx))
 
 
-@mcp.tool()
-async def sandbox_get_investigation_package(
-    ctx: Context,
-    result_id: str,
-    save_path: str,
-) -> dict:
-    """Download the full forensic investigation package from a sandbox analysis.
-
-    Downloads a ZIP file containing detailed forensic artifacts from the sandbox
-    detonation — network captures, dropped files, registry changes, process trees, etc.
-    Use when sandbox_get_report shows suspicious activity and you need to dig deeper.
-
-    Args:
-        result_id: The result ID from sandbox_get_status resourceLocation.
-        save_path: Absolute path where the ZIP file should be saved.
-    """
-    return await sandbox.get_investigation_package(_ctx(ctx), result_id, save_path)
-
-
-@mcp.tool()
-async def sandbox_list_submissions(
-    ctx: Context,
-    status: str | None = None,
-    action: str | None = None,
-    top: int = 50,
-) -> dict:
-    """List past sandbox submissions with optional filtering.
-
-    Returns submission history including task IDs, status, timestamps, and file digests.
-    Use to review what has been previously scanned or to find a past submission's results.
-
-    Args:
-        status: Filter by status — one of: succeeded, running, failed.
-        action: Filter by type — one of: analyzeFile, analyzeUrl.
-        top: Maximum submissions to return.
-    """
-    return await sandbox.list_submissions(_ctx(ctx), status, action, top)
-
-
-# --- Threat Intelligence (feeds) ---
+# --- Threat Intelligence ---
 
 
 @mcp.tool()
@@ -322,159 +271,6 @@ async def get_threat_indicators(
         end_date_time: ISO 8601 end of time range.
     """
     return await threat_intel.get_threat_indicators(_ctx(ctx), top, start_date_time, end_date_time)
-
-
-@mcp.tool()
-async def get_threat_reports(
-    ctx: Context,
-    top_report: int = 10,
-    location: str | None = None,
-    industry: str | None = None,
-    start_date_time: str | None = None,
-    end_date_time: str | None = None,
-) -> dict:
-    """Get threat intelligence reports with related STIX objects (campaigns, malware, CVEs).
-
-    Returns detailed threat reports filtered by geography and industry. Useful for
-    understanding the current threat landscape relevant to your deployment.
-
-    Args:
-        top_report: Maximum reports to return (5, 10, or 20).
-        location: Filter by geography (e.g., "United States of America", "Canada").
-        industry: Filter by industry (e.g., "Technology", "Finance", "Health").
-        start_date_time: ISO 8601 start of time range.
-        end_date_time: ISO 8601 end of time range.
-    """
-    return await threat_intel.get_threat_reports(
-        _ctx(ctx), top_report, location, industry, start_date_time, end_date_time
-    )
-
-
-# --- Detection & Alert Search ---
-
-
-@mcp.tool()
-async def search_detections(
-    ctx: Context,
-    query: str,
-    start_date_time: str | None = None,
-    end_date_time: str | None = None,
-    top: int = 50,
-    fields: list[str] | None = None,
-) -> dict:
-    """Search Vision One detection logs using query syntax.
-
-    Query supports fields like: fileName, fileHash, fileHashSha256, processCmd,
-    src, dst, malName, eventName, suser, duser, and 40+ more.
-    Operators: ':' (equals), 'and', 'or', 'not', 'contains'.
-
-    Args:
-        query: Detection query (e.g., "malName:Ransom* and dst:10.0.0.0/8").
-        start_date_time: ISO 8601 start of time range.
-        end_date_time: ISO 8601 end of time range.
-        top: Maximum results (up to 10000).
-        fields: Optional list of fields to include in results.
-    """
-    return await search.search_detections(
-        _ctx(ctx), query, start_date_time, end_date_time, top, fields
-    )
-
-
-@mcp.tool()
-async def list_alerts(
-    ctx: Context,
-    status: str | None = None,
-    severity: str | None = None,
-    start_date_time: str | None = None,
-    end_date_time: str | None = None,
-    top: int = 50,
-) -> dict:
-    """List workbench alerts from Vision One with filtering.
-
-    Returns alerts with matched detection rules, indicators, and impact scope
-    including affected endpoints, accounts, and containers.
-
-    Args:
-        status: Filter by status — one of: Open, In Progress, Closed.
-        severity: Filter by severity — one of: critical, high, medium, low.
-        start_date_time: ISO 8601 start of time range.
-        end_date_time: ISO 8601 end of time range.
-        top: Maximum alerts to return.
-    """
-    return await search.list_alerts(
-        _ctx(ctx), status, severity, start_date_time, end_date_time, top
-    )
-
-
-# --- Endpoint Actions ---
-
-
-@mcp.tool()
-async def start_malware_scan(
-    ctx: Context,
-    endpoints: list[dict],
-) -> dict:
-    """Trigger a malware scan on one or more managed endpoints.
-
-    Each endpoint dict must have either 'agent_guid' (UUID of the installed agent)
-    or 'endpoint_name' (computer name), and optionally 'description'.
-
-    Args:
-        endpoints: List of endpoints to scan (e.g., [{"endpoint_name": "WORKSTATION-01"}]).
-    """
-    return await endpoint.start_malware_scan(_ctx(ctx), endpoints)
-
-
-# --- YARA Rules ---
-
-
-@mcp.tool()
-async def list_yara_rules(
-    ctx: Context,
-    name_filter: str | None = None,
-    top: int = 50,
-) -> dict:
-    """List available YARA rule files in Vision One.
-
-    Args:
-        name_filter: Filter by exact rule file name.
-        top: Maximum results to return.
-    """
-    return await yara_rules.list_yara_rules(_ctx(ctx), name_filter, top)
-
-
-@mcp.tool()
-async def run_yara_rules(
-    ctx: Context,
-    endpoint_name: str | None = None,
-    agent_guid: str | None = None,
-    rule_content: str | None = None,
-    rule_file_id: str | None = None,
-    rule_file_name: str | None = None,
-    target_file_path: str | None = None,
-    target_process_name: str | None = None,
-    description: str | None = None,
-) -> dict:
-    """Run a YARA rule on an endpoint, targeting a specific file or process.
-
-    Provide the YARA rule as raw content, a file ID, or file name.
-    Target either a file path or process name on the endpoint.
-
-    Args:
-        endpoint_name: Computer name of the target endpoint.
-        agent_guid: UUID of the agent on the target endpoint (alternative to endpoint_name).
-        rule_content: Raw YARA rule content (max 2048 chars).
-        rule_file_id: ID of an existing YARA rule file in Vision One.
-        rule_file_name: Name of an existing YARA rule file in Vision One.
-        target_file_path: File path to scan on the endpoint (e.g., "C:\\Windows\\System32\\calc.exe").
-        target_process_name: Process name to scan on the endpoint.
-        description: Optional description for this task.
-    """
-    return await yara_rules.run_yara_rules(
-        _ctx(ctx), endpoint_name, agent_guid,
-        rule_content, rule_file_id, rule_file_name,
-        target_file_path, target_process_name, description,
-    )
 
 
 # --- Infrastructure as Code Scanning ---

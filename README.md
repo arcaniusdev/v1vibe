@@ -2,7 +2,7 @@
 
 An MCP server that gives AI coding assistants real-time security validation powered by [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Scan files for malware, detonate suspicious files and URLs in a cloud sandbox, look up threat intelligence, and validate AI-generated content — all from within your AI coding workflow.
 
-## Features (21 tools)
+## Features (13 tools)
 
 ### File & Code Security
 | Tool | What it does |
@@ -14,24 +14,12 @@ An MCP server that gives AI coding assistants real-time security validation powe
 | `sandbox_get_report` | Get full analysis report with risk level, detections, and suspicious objects |
 | `ai_guard_evaluate` | Check text for harmful content, PII leakage, and prompt injection |
 | `get_submission_quota` | Check remaining daily sandbox submission quota |
-| `sandbox_get_investigation_package` | Download full forensic investigation package (ZIP) from sandbox |
-| `sandbox_list_submissions` | List past sandbox submissions with filtering |
 
 ### Threat Intelligence
 | Tool | What it does |
 |------|-------------|
 | `check_suspicious_objects` | Look up URLs, domains, IPs, or file hashes in threat intelligence |
-| `get_threat_indicators` | Get IoCs (STIX 2.1) from Trend threat intelligence feeds |
-| `get_threat_reports` | Get intelligence reports filtered by location and industry |
-
-### Detection & Response
-| Tool | What it does |
-|------|-------------|
-| `search_detections` | Query detection logs by file hash, process, IP, malware name, etc. |
-| `list_alerts` | List workbench alerts filtered by status and severity |
-| `start_malware_scan` | Trigger a remote malware scan on managed endpoints |
-| `list_yara_rules` | List available YARA rule files |
-| `run_yara_rules` | Execute YARA rules on endpoints targeting files or processes |
+| `get_threat_indicators` | Pull IoC feed (STIX 2.1) to cross-reference against project files |
 
 ### Infrastructure as Code Scanning
 | Tool | What it does |
