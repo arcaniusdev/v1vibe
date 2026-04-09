@@ -68,13 +68,17 @@ Cargo.toml, Gemfile, composer.json, etc.) and identify dependencies with known C
 → If the project has a Dockerfile or docker-compose.yml, run `list_container_vulnerabilities`.
 → Report: CVE ID, CVSS score, severity, fix version availability.
 
-### 6. SANDBOX DETONATION — detonate suspicious or executable files
-Identify files that benefit from behavioral analysis: executables, scripts with complex logic, \
-documents with macros, JARs, compiled binaries, anything flagged in step 1.
-→ Run `sandbox_submit_file` on each.
+### 6. SANDBOX DETONATION — detonate files with supported extensions
+The sandbox supports these file types: executables (.exe, .dll, .com, .msi, .dmg, .pkg), \
+scripts (.bat, .cmd, .js, .vbs, .ps1, .sh, .py, .hta, .wsf), documents (.doc, .docx, .xls, \
+.xlsx, .ppt, .pptx, .pdf, .rtf, .odt, .ods, .odp, .csv, .xml), Java (.class, .jar), \
+web content (.html, .svg, .mht), archives (.zip, .7z, .rar, .tar, .gz), email (.eml, .msg), \
+and more. Only submit files with supported extensions — the tool will reject unsupported types.
+→ Run `sandbox_submit_file` on each supported file.
 → Poll with `sandbox_get_status` until done.
 → Get results with `sandbox_get_report`.
 → Report: risk level, detections, suspicious objects extracted.
+→ For files with unsupported extensions, rely on `scan_file` results from step 1.
 
 ### 7. AI CONTENT VALIDATION — always run this
 Run `ai_guard_evaluate` on EVERY security review. Submit a summary of the project's purpose \
@@ -137,8 +141,16 @@ async def sandbox_submit_file(
     """Submit a file to Trend Micro sandbox for deep behavioral analysis (detonation).
 
     Returns a task ID to check status later with sandbox_get_status.
-    Use for files that need dynamic analysis beyond static malware scanning.
-    Supported types include executables, scripts, documents, Java files, and more.
+    Only files with supported extensions can be sandboxed — unsupported types will be
+    rejected with a suggestion to use scan_file instead.
+
+    Supported: executables (.exe, .dll, .msi, .dmg, .pkg), scripts (.bat, .cmd, .js,
+    .vbs, .ps1, .sh, .py, .hta, .wsf), documents (.doc, .docx, .xls, .xlsx, .ppt,
+    .pptx, .pdf, .rtf, .csv, .xml), Java (.class, .jar), web (.html, .svg),
+    archives (.zip, .7z, .rar, .tar, .gz), email (.eml, .msg), and more.
+
+    Note: scan_file (File Security SDK) accepts ANY file type for malware scanning.
+    This sandbox tool is for deep behavioral detonation of supported types only.
 
     Args:
         file_path: Absolute path to the file to submit.

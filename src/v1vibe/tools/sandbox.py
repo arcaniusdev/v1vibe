@@ -7,6 +7,45 @@ from typing import Any
 from v1vibe.clients import AppContext
 from v1vibe.utils import check_multi_status, check_response, format_error
 
+# File extensions supported by Vision One sandbox for detonation.
+# Source: Trend Micro docs + confirmed Python support (2026).
+SANDBOX_SUPPORTED_EXTENSIONS: set[str] = {
+    # Executables & libraries
+    ".exe", ".dll", ".com", ".cpl", ".crt", ".scr", ".sys", ".ocx", ".drv",
+    ".msi", ".o",
+    # Scripts
+    ".bat", ".cmd", ".js", ".jse", ".vbs", ".vbe", ".wsf", ".ps1", ".hta",
+    ".sh", ".py",
+    # Documents
+    ".doc", ".dot", ".docx", ".dotx", ".docm", ".dotm",
+    ".xls", ".xla", ".xlt", ".xlm", ".xlsx", ".xlsb", ".xltx", ".xlsm", ".xlam", ".xltm",
+    ".ppt", ".pps", ".pptx", ".ppsx", ".potm", ".ppam", ".ppsm", ".pptm",
+    ".pdf", ".rtf", ".pub", ".csv", ".slk", ".iqy", ".xml",
+    ".odt", ".ods", ".odp",
+    # Web content
+    ".htm", ".html", ".xht", ".xhtml", ".mht", ".mhtml", ".svg", ".swf",
+    # Java
+    ".class", ".cla", ".jar",
+    # Shortcuts & links
+    ".lnk", ".url",
+    # Other
+    ".chm", ".cell", ".mov",
+    # macOS
+    ".dmg", ".pkg",
+    # Email
+    ".eml", ".email", ".msg",
+    # Archives (sandbox extracts and analyzes contents)
+    ".7z", ".ace", ".alz", ".arj", ".hqx", ".bz2", ".bzip2", ".egg",
+    ".gzip", ".gz", ".lha", ".lharc", ".rar", ".tar", ".tgz",
+    ".tnef", ".uue", ".xz", ".zip",
+}
+
+
+def is_sandbox_supported(file_path: str) -> bool:
+    """Check if a file's extension is supported by the Vision One sandbox."""
+    _, ext = os.path.splitext(file_path)
+    return ext.lower() in SANDBOX_SUPPORTED_EXTENSIONS
+
 
 async def submit_file(
     ctx: AppContext,
@@ -18,6 +57,16 @@ async def submit_file(
     try:
         if not os.path.isfile(file_path):
             return {"error": {"code": "FileNotFound", "message": f"File not found: {file_path}"}}
+
+        if not is_sandbox_supported(file_path):
+            _, ext = os.path.splitext(file_path)
+            return {
+                "error": {
+                    "code": "UnsupportedFileType",
+                    "message": f"File extension '{ext}' is not supported by the Vision One sandbox. "
+                    f"Use scan_file for a quick malware scan instead.",
+                }
+            }
 
         with open(file_path, "rb") as f:
             files = {"file": (os.path.basename(file_path), f, "application/octet-stream")}
