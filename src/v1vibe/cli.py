@@ -93,10 +93,7 @@ def _get_platform_info() -> tuple[str, str, str]:
     if system == "Windows" or system.startswith(("CYGWIN", "MINGW", "MSYS")):
         os_name = "Windows"
         ext = "zip"
-    elif system == "Darwin":
-        os_name = "Darwin"
-        ext = "tar.gz"
-    else:  # Linux and others
+    else:  # Linux, Darwin (macOS), and others all use Linux binary
         os_name = "Linux"
         ext = "tar.gz"
 
@@ -125,6 +122,10 @@ def _install_tmas() -> str | None:
         if not version:
             _print("  Error: Could not determine TMAS version")
             return None
+
+        # Strip "v" prefix if present (metadata has "v2.221.0", URL needs "2.221.0")
+        if version.startswith("v"):
+            version = version[1:]
 
         # 2. Get platform info
         os_name, arch, ext = _get_platform_info()
