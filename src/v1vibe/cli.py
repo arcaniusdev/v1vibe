@@ -481,10 +481,12 @@ def cmd_setup() -> None:
     _print(f"  Saved to {CONFIG_FILE}")
     _print()
 
-    # Step 6: Register with Claude Code
-    _print("Step 6: Claude Code integration")
+    # Step 6: MCP client integration
+    _print("Step 6: MCP client integration")
     claude_path = shutil.which("claude")
     if claude_path:
+        # Claude Code detected - offer automated registration
+        _print("  Claude Code detected!")
         register = _input("  Register v1vibe as an MCP server with Claude Code? [Y/n] ").strip().lower()
         if register != "n":
             _print()
@@ -525,33 +527,49 @@ def cmd_setup() -> None:
                 _print(f"  Register manually:")
                 _print(f"    claude mcp add --transport stdio --scope user v1vibe -- {' '.join(cmd_args)}")
             _print()
+
+        # Step 7: CLAUDE.md instructions (Claude Code only)
+        _print("Step 7: CLAUDE.md instructions")
+        claude_md_path = Path.home() / ".claude" / "CLAUDE.md"
+
+        already_has = False
+        if claude_md_path.exists():
+            content = claude_md_path.read_text()
+            if "v1vibe" in content:
+                already_has = True
+                _print("  v1vibe instructions already present in ~/.claude/CLAUDE.md")
+
+        if not already_has:
+            add_instructions = _input(
+                "  Add v1vibe instructions to ~/.claude/CLAUDE.md so Claude proactively uses it? [Y/n] "
+            ).strip().lower()
+            if add_instructions != "n":
+                claude_md_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(claude_md_path, "a") as f:
+                    f.write(CLAUDE_MD_SNIPPET)
+                _print("  Added v1vibe instructions to ~/.claude/CLAUDE.md")
+        _print()
     else:
-        _print("  Claude Code CLI not found. To register manually after installing Claude Code:")
-        _print("    claude mcp add --transport stdio --scope user v1vibe -- v1vibe")
+        # No Claude Code - show manual configuration for other MCP clients
+        _print("  Claude Code not detected.")
+        _print()
+        _print("  For other MCP clients (Cursor, GitHub Copilot, etc.), add to your MCP config:")
+        _print()
+        _print('  {')
+        _print('    "mcpServers": {')
+        _print('      "v1vibe": {')
+        _print('        "command": "v1vibe",')
+        _print('        "env": {')
+        _print(f'          "V1_API_TOKEN": "{_mask_token(api_token)}",')
+        _print(f'          "V1_REGION": "{region}"')
+        _print('        }')
+        _print('      }')
+        _print('    }')
+        _print('  }')
+        _print()
+        _print("  See https://github.com/arcaniusdev/v1vibe#other-mcp-clients for details.")
         _print()
 
-    # Step 7: CLAUDE.md instructions
-    _print("Step 7: CLAUDE.md instructions")
-    claude_md_path = Path.home() / ".claude" / "CLAUDE.md"
-
-    already_has = False
-    if claude_md_path.exists():
-        content = claude_md_path.read_text()
-        if "v1vibe" in content:
-            already_has = True
-            _print("  v1vibe instructions already present in ~/.claude/CLAUDE.md")
-
-    if not already_has:
-        add_instructions = _input(
-            "  Add v1vibe instructions to ~/.claude/CLAUDE.md so Claude proactively uses it? [Y/n] "
-        ).strip().lower()
-        if add_instructions != "n":
-            claude_md_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(claude_md_path, "a") as f:
-                f.write(CLAUDE_MD_SNIPPET)
-            _print("  Added v1vibe instructions to ~/.claude/CLAUDE.md")
-
-    _print()
     _print("Setup complete! v1vibe is ready to use.")
     _print()
     _print("Quick test:  v1vibe test")
@@ -726,10 +744,11 @@ def cmd_status() -> None:
     else:
         _print("TMAS CLI:    not installed (run: v1vibe setup)")
 
-    # Claude Code registration
+    # MCP client integration (only show if Claude Code is installed)
     _print()
     claude_path = shutil.which("claude")
     if claude_path:
+        # Claude Code detected - show registration status
         try:
             result = subprocess.run(
                 [claude_path, "mcp", "list"], capture_output=True, text=True
@@ -740,15 +759,17 @@ def cmd_status() -> None:
                 _print("Claude Code: not registered (run: v1vibe setup)")
         except Exception:
             _print("Claude Code: could not check registration")
-    else:
-        _print("Claude Code: CLI not found")
 
-    # CLAUDE.md
-    claude_md = Path.home() / ".claude" / "CLAUDE.md"
-    if claude_md.exists() and "v1vibe" in claude_md.read_text():
-        _print("CLAUDE.md:   v1vibe instructions present")
+        # CLAUDE.md status
+        claude_md = Path.home() / ".claude" / "CLAUDE.md"
+        if claude_md.exists() and "v1vibe" in claude_md.read_text():
+            _print("CLAUDE.md:   v1vibe instructions present")
+        else:
+            _print("CLAUDE.md:   v1vibe instructions not found (run: v1vibe setup)")
     else:
-        _print("CLAUDE.md:   v1vibe instructions not found (run: v1vibe setup)")
+        # No Claude Code - show generic MCP status
+        _print("MCP client:  Configure manually (Claude Code not detected)")
+        _print("Info:        https://github.com/arcaniusdev/v1vibe#other-mcp-clients")
 
 
 def cmd_uninstall() -> None:
@@ -756,13 +777,18 @@ def cmd_uninstall() -> None:
     _print("=" * 52)
     _print()
 
+    claude_path = shutil.which("claude")
+
     _print("This will remove:")
     _print(f"  • Configuration and binaries: {CONFIG_DIR}")
-    _print("  • Claude Code MCP registration")
-    _print("  • v1vibe instructions from ~/.claude/CLAUDE.md")
+    if claude_path:
+        _print("  • Claude Code MCP registration")
+        _print("  • v1vibe instructions from ~/.claude/CLAUDE.md")
     _print()
     _print("This will NOT remove:")
     _print("  • The v1vibe Python package (uninstall with: uv tool uninstall v1vibe)")
+    if not claude_path:
+        _print("  • Your MCP client configuration (remove manually if needed)")
     _print()
 
     confirm = _input("Continue? [y/N] ").strip().lower()
@@ -772,10 +798,9 @@ def cmd_uninstall() -> None:
 
     _print()
 
-    # 1. Unregister from Claude Code
-    _print("Unregistering from Claude Code...")
-    claude_path = shutil.which("claude")
+    # 1. Unregister from Claude Code (if installed)
     if claude_path:
+        _print("Unregistering from Claude Code...")
         try:
             result = subprocess.run(
                 [claude_path, "mcp", "remove", "v1vibe"], capture_output=True, text=True
@@ -786,24 +811,22 @@ def cmd_uninstall() -> None:
                 _print("  Not registered (or already removed)")
         except Exception as e:
             _print(f"  Warning: Could not unregister: {e}")
-    else:
-        _print("  Claude Code CLI not found (skipped)")
 
-    # 2. Remove v1vibe section from CLAUDE.md
-    _print("Cleaning ~/.claude/CLAUDE.md...")
-    claude_md_path = Path.home() / ".claude" / "CLAUDE.md"
-    if claude_md_path.exists():
-        content = claude_md_path.read_text()
-        if "## Security Validation with v1vibe" in content:
-            # Remove the v1vibe section (from header to end of snippet)
-            pattern = r"\n## Security Validation with v1vibe.*?(?=\n## |\Z)"
-            cleaned = re.sub(pattern, "", content, flags=re.DOTALL)
-            claude_md_path.write_text(cleaned)
-            _print("  Removed v1vibe instructions")
+        # 2. Remove v1vibe section from CLAUDE.md
+        _print("Cleaning ~/.claude/CLAUDE.md...")
+        claude_md_path = Path.home() / ".claude" / "CLAUDE.md"
+        if claude_md_path.exists():
+            content = claude_md_path.read_text()
+            if "## Security Validation with v1vibe" in content:
+                # Remove the v1vibe section (from header to end of snippet)
+                pattern = r"\n## Security Validation with v1vibe.*?(?=\n## |\Z)"
+                cleaned = re.sub(pattern, "", content, flags=re.DOTALL)
+                claude_md_path.write_text(cleaned)
+                _print("  Removed v1vibe instructions")
+            else:
+                _print("  No v1vibe instructions found")
         else:
-            _print("  No v1vibe instructions found")
-    else:
-        _print("  File not found (skipped)")
+            _print("  File not found (skipped)")
 
     # 3. Remove config directory and binaries
     _print(f"Removing {CONFIG_DIR}...")
