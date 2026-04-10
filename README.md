@@ -9,7 +9,7 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 - 🐳 **Container Security** — Scan Docker images and registries for vulnerabilities
 - 🌐 **URL Analysis** — Sandbox and analyze URLs for malicious behavior
 - ☁️ **IaC Security** — Scan CloudFormation and Terraform for misconfigurations
-- 🔎 **Threat Intelligence** — Look up IPs, domains, hashes in global threat feeds
+- 🔎 **Threat Intelligence** — Check URLs, domains, IPs, and file hashes against your organization's custom blocklist
 - 🤖 **AI Safety** — Validate AI prompts and chatbot content for harmful content and prompt injection
 
 ## Features (12 tools)
@@ -39,12 +39,12 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 | Tool | What it does |
 |------|-------------|
 | `scan_iac_template` | Scan CloudFormation (YAML/JSON) or Terraform plan (JSON) for security misconfigurations |
-| `scan_terraform_archive` | Scan ZIP of Terraform HCL (.tf) files for compliance violations |
+| `scan_terraform_archive` | Scan ZIP of Terraform HCL (.tf) files for security misconfigurations |
 
 ### 🔎 Threat Intelligence
 | Tool | What it does |
 |------|-------------|
-| `check_suspicious_objects` | Look up URLs, domains, IPs, email addresses, or file hashes in threat feeds |
+| `check_suspicious_objects` | Check URLs, domains, IPs, email addresses, or file hashes against your organization's custom blocklist |
 
 ### 🛡️ Vulnerabilities
 | Tool | What it does |
@@ -257,8 +257,8 @@ When the user asks for any security review, check, or scan, complete EVERY step:
 4. **IAC SCAN** -- `scan_iac_template` on every CloudFormation/Terraform file. `scan_terraform_archive` for HCL directories.
 5. **ARTIFACT SCAN** -- `scan_artifact` on project directory (ALWAYS run unless pure docs/config). Scans for dependency CVEs, malware in packages, and exposed secrets.
 6. **CVE DETAILS** -- `get_cve_details` for specific HIGH/CRITICAL CVEs to get mitigation info.
-7. **AI GUARD** -- ALWAYS run `ai_guard_evaluate` with project summary. NOT optional.
-8. **REPORT** -- Results from ALL steps: malware, URLs, threat intel, IaC, artifacts, CVEs, AI Guard. Recommend remediation.
+7. **AI GUARD** (conditional) -- If project contains AI prompts, chatbot instructions, or LLM templates, use `ai_guard_evaluate` to check for harmful content and prompt injection. Skip if no AI content.
+8. **REPORT** -- Results from ALL applicable steps: malware, URLs, threat intel, IaC, artifacts, CVEs, AI Guard (if run). Recommend remediation.
 
 **Do NOT skip steps because they seem unlikely to find something. Clean results are valid results.**
 ```

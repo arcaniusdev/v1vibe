@@ -295,10 +295,10 @@ async def check_suspicious_objects(
     value: str,
     risk_level: str | None = None,
 ) -> dict:
-    """Look up a URL, domain, IP address, email, or file hash in Trend Micro threat intelligence.
+    """Check if a URL, domain, IP address, email, or file hash is in your organization's custom blocklist.
 
-    Returns matching suspicious objects with risk levels and scan actions.
-    Use to validate external resources referenced in code.
+    Returns matching suspicious objects with risk levels and scan actions from your
+    tenant's blocklist (not global threat intelligence).
 
     Args:
         object_type: Type of object — one of: url, domain, ip, fileSha1, fileSha256, senderMailAddress.

@@ -184,16 +184,45 @@ async def scan_artifact(
                 for arg in additional_args.split():
                     validated_extra_args.append(shlex.quote(arg))
 
-            # Build Docker command (no shell=True, so no injection risk here)
-            cmd = [
-                "docker", "run", "--rm",
-                "-v", f"{artifact_abs}:/scan:ro",  # Mount artifact read-only
+            # Determine artifact type and how to scan it
+            is_directory = not any(
+                artifact_validated.startswith(p)
+                for p in ["registry:", "docker:", "docker-archive:", "oci-archive:", "oci-dir:", "podman:"]
+            )
+
+            # Build Docker command base
+            cmd = ["docker", "run", "--rm"]
+
+            # Configure volume mounts based on artifact type
+            if is_directory:
+                # Mount directory for scanning
+                cmd.extend(["-v", f"{artifact_abs}:/scan:ro"])
+                scan_target = "dir:/scan"
+            elif artifact_validated.startswith("docker:"):
+                # Mount Docker socket for docker: images (needs access to Docker daemon)
+                cmd.extend(["-v", "/var/run/docker.sock:/var/run/docker.sock"])
+                scan_target = shlex.quote(artifact_validated)
+            elif artifact_validated.startswith(("docker-archive:", "oci-archive:")):
+                # Mount archive file's parent directory
+                archive_path = artifact_validated.split(":", 1)[1]
+                archive_dir = str(Path(archive_path).parent)
+                archive_name = Path(archive_path).name
+                cmd.extend(["-v", f"{archive_dir}:/archives:ro"])
+                # Reconstruct the archive reference with mounted path
+                archive_prefix = artifact_validated.split(":", 1)[0]
+                scan_target = shlex.quote(f"{archive_prefix}:/archives/{archive_name}")
+            else:
+                # registry:, oci-dir:, podman: - pass through directly (network access only)
+                scan_target = shlex.quote(artifact_validated)
+
+            # Common mounts and environment
+            cmd.extend([
                 "-v", f"{tmpdir}:/output",  # Mount output directory
                 "-e", f"TMAS_API_KEY={ctx.settings.api_token}",
                 "-w", "/tmp",
                 DOCKER_IMAGE,
                 "sh", "-c",
-            ]
+            ])
 
             # Build the shell command to run inside container with proper escaping
             tmas_flags = []
@@ -218,7 +247,7 @@ async def scan_artifact(
                 "apt-get update -qq && apt-get install -y -qq curl > /dev/null 2>&1 &&",
                 "ARCH=$(uname -m); [ \"$ARCH\" = \"aarch64\" ] && ARCH=\"arm64\" || true;",
                 f"curl -sL {shlex.quote(tmas_url)} | tar xz &&",
-                "./tmas scan dir:/scan",
+                f"./tmas scan {scan_target}",
                 " ".join(tmas_flags),
             ]
 
