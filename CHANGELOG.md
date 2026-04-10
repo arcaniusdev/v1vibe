@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Malware Scan Instructions**: Strengthened AI assistant guidance for comprehensive file scanning
+  - `server.py`: Added concrete `find` command examples instead of vague "find all files" instruction
+  - `server.py`: Added validation checkpoint - "if <10 files scanned, you MISSED files"
+  - `server.py`: Added mandatory reporting - "report 'Scanned X files' before proceeding"
+  - `server.py`: Added performance justification - gRPC scanner is fast (~1s/file), no reason to skip
+  - Affects: `SERVER_INSTRUCTIONS`, `security_review` MCP prompt, `scan_malware` MCP prompt
+  - **Impact**: AI assistants now have measurable, enforceable steps instead of abstract imperatives
+  - **Why**: Previous instructions were too vague - assistants would scan 5-10 files instead of all files
+  - **Benefit**: Ensures complete malware coverage during security audits (2026-04-10)
+
 ### Fixed
 
 #### Phase 1: Critical Resource Management & Security (2026-04-10)
