@@ -9,7 +9,7 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 - 🐳 **Container Security** — Scan Docker images and registries for vulnerabilities
 - 🌐 **URL Analysis** — Sandbox and analyze URLs for malicious behavior
 - ☁️ **IaC Security** — Scan CloudFormation and Terraform for misconfigurations
-- 🔎 **Threat Intelligence** — Check URLs, domains, IPs, and file hashes against your organization's custom blocklist
+- 🔎 **Threat Intelligence** — Search global threat indicators (domains, IPs, URLs, file hashes, registry keys, mutexes, email addresses) from Trend Micro threat feed. Cached locally with hourly delta updates for instant lookups.
 - 🤖 **AI Safety** — Validate AI prompts and chatbot content for harmful content and prompt injection
 
 ## Features (12 tools)
@@ -54,7 +54,16 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 ### 🔎 Threat Intelligence
 | Tool | What it does |
 |------|-------------|
+| `search_threat_indicators` | **NEW:** Search global threat indicators from Trend Micro feed. Cached locally with hourly delta updates. **Detects all IOC types:** file hashes (SHA256/SHA1/MD5), domains, IPs, URLs, network traffic, email addresses, Windows registry keys, mutexes, file paths, hostnames, process names. **Instant lookups** — scan every IP, domain, URL, hash, email, registry key, mutex in your project against global threat intelligence. |
 | `check_suspicious_objects` | Check URLs, domains, IPs, email addresses, or file hashes against your organization's custom blocklist |
+
+**Scan deeply for IOCs in your projects:**
+- **Hardcoded IPs/domains/URLs** in source code, configs, scripts
+- **File hashes** in build artifacts, checksums, download lists
+- **Email addresses** in configs, templates, sender validation
+- **Registry keys** in Windows scripts, installers, PowerShell
+- **Mutexes** in malware analysis code, synchronization primitives
+- **File paths** in scripts (detect known malware installation paths)
 
 ### 🛡️ Vulnerabilities
 | Tool | What it does |

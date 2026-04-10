@@ -59,16 +59,68 @@ archives (.zip, .jar, .war), and binaries.
 Search ALL project files for URLs: API endpoints, download links, webhook URLs, \
 dependency sources, CDN links, redirect targets, OAuth endpoints, etc. Look in source \
 code, configs, .env.example, README, package files, Dockerfiles, IaC templates.
-→ Use `check_suspicious_objects` (type "domain") for each unique domain (instant).
-→ Report: each URL, where found, suspicious object matches.
+→ Use `search_threat_indicators` for each unique domain/URL (searches global threat feed).
+→ Also use `check_suspicious_objects` (type "domain") to check tenant blocklist.
+→ Report: each URL, where found, any threat intelligence matches.
 → **Recommend sandboxing** for suspicious or unknown domains (not well-known like \
 microsoft.com, google.com, github.com, etc.). If sandboxing, use `sandbox_submit_url`, \
 poll with `sandbox_get_status`, and get results with `sandbox_get_report`.
 
-### 3. THREAT INTELLIGENCE — check every external reference
-Find ALL external IPs, domains, email addresses, and file hashes in the code and configs.
-→ Run `check_suspicious_objects` for each one.
-→ Report: any matches with risk level and recommended action.
+### 3. THREAT INTELLIGENCE — deeply scan for ALL indicators of compromise (IOCs) [MANDATORY]
+**CRITICAL:** Check EVERY potential IOC found in the project against global threat intelligence.
+This is a fast, cached lookup (instant) — there is NO reason to skip any IOC.
+
+**SCAN INSIDE FILES** — Use grep/Read to search file contents for IOCs. Do NOT just look at filenames.
+Extract and check ALL of these IOC types from source code, configs, scripts, build files:
+
+1. **Domains, URLs, IPs** (most common)
+   - Search pattern: `https?://[^\s]+`, `[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}`, domain patterns
+   - Where: API endpoints, CDN URLs, external services, hardcoded addresses in code
+   - Files to scan: ALL source code, configs, .env.example, README, package files, Dockerfiles, IaC templates
+   - How: Use Grep with URL/IP regex patterns, then extract unique values
+   - Check: Every unique domain, URL, and IP address (don't skip well-known domains - check them too)
+
+2. **File hashes** (SHA256, SHA1, MD5)
+   - Search pattern: SHA256 (64 hex chars), SHA1 (40 hex chars), MD5 (32 hex chars)
+   - Where: Checksums in lock files, integrity manifests, download verification code, CI/CD scripts
+   - Files to scan: package-lock.json, poetry.lock, Cargo.lock, checksums.txt, SHA256SUMS, *.sum files, scripts
+   - How: Use Grep for `[a-f0-9]{64}`, `[a-f0-9]{40}`, `[a-f0-9]{32}` patterns
+   - Check: Every hash found (even if it looks like a dependency checksum - could be trojaned)
+
+3. **Email addresses**
+   - Search pattern: `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`
+   - Where: Sender/recipient configs, contact lists, SMTP settings, notification configs
+   - Files to scan: configs, templates, .env files, CI/CD configs, alerting rules, source code
+   - How: Use Grep for email regex pattern
+   - Check: Every email address (sender and recipient)
+
+4. **Windows registry keys**
+   - Search pattern: `HKEY_[A-Z_]+\\`, registry key paths
+   - Where: PowerShell scripts, batch files, installers, uninstallers, Windows configs
+   - Files to scan: .ps1, .bat, .cmd, .reg files, install/uninstall scripts
+   - How: Use Grep for `HKEY_` or Read PowerShell scripts
+   - Check: Every registry key path (HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER, etc.)
+
+5. **Mutexes** (synchronization primitives)
+   - Search pattern: Mutex names, GUIDs in braces, CreateMutex calls
+   - Where: Threading code, CreateMutex calls, named locks, semaphore names
+   - Files to scan: Source code with threading, concurrent programming, system-level code
+   - How: Grep for "CreateMutex", "mutex", GUID patterns `{[a-f0-9-]{36}}`
+   - Check: Every mutex name (including GUIDs in braces)
+
+6. **File paths** (system/installation paths)
+   - Search pattern: Windows paths `C:\\`, `%[A-Z]+%`, Unix paths `/tmp/`, `/var/`, `~/`
+   - Where: Installation directories, temp paths, hardcoded system paths in scripts
+   - Files to scan: Install scripts, deployment configs, path constants in code
+   - How: Grep for path patterns (C:\\, /tmp/, /var/, AppData, ProgramData)
+   - Check: System paths like C:\Users\..., /tmp/, /var/, AppData paths, /etc/ paths
+
+**For EACH unique IOC found:**
+→ Run `search_threat_indicators` with the IOC value (instant lookup against cached global threat feed)
+→ Also run `check_suspicious_objects` to check against your tenant's custom blocklist
+→ Report ALL matches: IOC type, value, where found, threat indicator details, valid dates, recommended action
+
+**Do NOT skip IOCs because they "look safe"** — many legitimate-looking values are malicious.
 
 ### 4. IAC TEMPLATE SCAN — scan every infrastructure template
 Find ALL CloudFormation files (.yaml, .json, .template) and Terraform files (.tf, .tf.json).
@@ -308,6 +360,35 @@ async def check_suspicious_objects(
     return await threat_intel.check_suspicious_objects(
         _ctx(ctx), object_type, value, risk_level
     )
+
+
+@mcp.tool()
+async def search_threat_indicators(
+    ctx: Context,
+    indicator_value: str,
+) -> dict:
+    """Search Trend Micro threat intelligence feed for a specific indicator.
+
+    Searches the complete threat intelligence feed for matches. The feed is cached
+    locally and refreshed hourly with delta updates.
+
+    This provides instant lookups against global threat intelligence, complementing
+    check_suspicious_objects (tenant blocklist) and sandbox_submit_url (deep analysis).
+
+    Supported indicator types (auto-detected):
+    - Domains, URLs, IPs (IPv4/IPv6)
+    - File hashes (SHA256, SHA1, MD5)
+    - Email addresses
+    - Windows registry keys
+    - Mutexes, file paths, hostnames, process names
+
+    Args:
+        indicator_value: The indicator to search for (any type listed above).
+
+    Returns:
+        Match results with indicator details, threat types, and cache info.
+    """
+    return await threat_intel.search_threat_indicators(_ctx(ctx), indicator_value)
 
 
 @mcp.tool()
