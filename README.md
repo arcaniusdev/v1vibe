@@ -76,22 +76,22 @@ v1vibe setup
 
 **Vision One account:**
 - A [TrendAI Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html) account
-- An API key with appropriate permissions ([see required permissions](#getting-your-api-key))
+- An API key with the following permissions:
+  - **File Security** — Run file scan via SDK
+  - **Sandbox Analysis** — Submit object, View/filter/search
+  - **Threat Intelligence** — View, Suspicious Object Management (View)
+  - **AI Application Security** — AI Guard (Call detection API), AI Scanner
+  - **Container Security** — Run artifacts scan
+  - **Cloud Posture** — Scan templates (for IaC scanning)
+  - **Vulnerability Management** — Read CVEs
 
 <details>
-<summary><b>🔑 Getting your API key</b></summary>
+<summary><b>🔑 How to get your API key</b></summary>
 
 1. Log in to [TrendAI Vision One](https://portal.xdr.trendmicro.com)
 2. Navigate to **Administration > API Keys**
 3. Click **Add API Key**
-4. Assign a role with these permissions:
-   - **File Security** — Run file scan via SDK
-   - **Sandbox Analysis** — Submit object, View/filter/search
-   - **Threat Intelligence** — View, Suspicious Object Management (View)
-   - **AI Application Security** — AI Guard (Call detection API), AI Scanner
-   - **Container Security** — Run artifacts scan
-   - **Cloud Posture** — Scan templates (for IaC scanning)
-   - **Vulnerability Management** — Read CVEs
+4. Assign a role with the permissions listed above
 </details>
 
 ## How to Use
@@ -102,6 +102,7 @@ No APIs to learn, no commands to memorize. Simply ask your AI assistant to check
 
 - _"Check the security of this project"_
 - _"Is this file safe?"_
+- _"Sandbox this file / URL"_
 - _"Scan my dependencies for vulnerabilities"_
 - _"Find any secrets in my code"_
 - _"Review this CloudFormation template for security issues"_
