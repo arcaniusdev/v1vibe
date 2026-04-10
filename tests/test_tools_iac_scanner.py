@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock
 from v1vibe.tools.iac_scanner import (
     scan_template,
     scan_terraform_archive,
+    list_compliance_standards,
+    list_compliance_profiles,
     VALID_TEMPLATE_TYPES,
 )
 
@@ -204,3 +206,187 @@ Resources:
         assert "cloudformation-template" in VALID_TEMPLATE_TYPES
         assert "terraform-template" in VALID_TEMPLATE_TYPES
         assert len(VALID_TEMPLATE_TYPES) == 2
+
+    @pytest.mark.asyncio
+    async def test_list_compliance_standards(self, mock_app_context):
+        """Test listing compliance standards."""
+        request = httpx.Request("GET", "https://api.xdr.trendmicro.com/beta/cloudPosture/complianceStandards")
+        response = httpx.Response(
+            200,
+            json={
+                "count": 3,
+                "items": [
+                    {
+                        "id": "CIS-V8",
+                        "name": "CIS Benchmarks",
+                        "version": "v8.0",
+                        "providers": ["aws", "azure", "gcp"]
+                    },
+                    {
+                        "id": "NIST4",
+                        "name": "NIST Cybersecurity Framework",
+                        "version": "2.0",
+                        "providers": ["aws", "azure", "gcp"]
+                    },
+                    {
+                        "id": "AWAF-2025",
+                        "name": "AWS Well-Architected Framework",
+                        "version": "2025",
+                        "providers": ["aws"]
+                    }
+                ]
+            },
+            request=request,
+        )
+        mock_app_context.http.get = AsyncMock(return_value=response)
+
+        result = await list_compliance_standards(mock_app_context)
+
+        assert "count" in result
+        assert result["count"] == 3
+        assert len(result["items"]) == 3
+        assert result["items"][0]["id"] == "CIS-V8"
+        assert result["items"][1]["id"] == "NIST4"
+
+    @pytest.mark.asyncio
+    async def test_list_compliance_profiles(self, mock_app_context):
+        """Test listing compliance profiles."""
+        request = httpx.Request("GET", "https://api.xdr.trendmicro.com/beta/cloudPosture/profiles")
+        response = httpx.Response(
+            200,
+            json={
+                "count": 2,
+                "items": [
+                    {
+                        "id": "3PfYLfW",
+                        "name": "CIS AWS Foundations",
+                        "description": "CIS Benchmark for AWS",
+                        "complianceStandards": [{"id": "CIS-V8"}]
+                    },
+                    {
+                        "id": "4XgZMnP",
+                        "name": "NIST Cybersecurity",
+                        "description": "NIST CSF controls",
+                        "complianceStandards": [{"id": "NIST4"}]
+                    }
+                ]
+            },
+            request=request,
+        )
+        mock_app_context.http.get = AsyncMock(return_value=response)
+
+        result = await list_compliance_profiles(mock_app_context)
+
+        assert "count" in result
+        assert result["count"] == 2
+        assert len(result["items"]) == 2
+        assert result["items"][0]["id"] == "3PfYLfW"
+        assert result["items"][0]["name"] == "CIS AWS Foundations"
+
+    @pytest.mark.asyncio
+    async def test_list_compliance_profiles_with_limit(self, mock_app_context):
+        """Test listing compliance profiles with custom limit."""
+        request = httpx.Request("GET", "https://api.xdr.trendmicro.com/beta/cloudPosture/profiles")
+        response = httpx.Response(
+            200,
+            json={"count": 0, "items": []},
+            request=request,
+        )
+        mock_app_context.http.get = AsyncMock(return_value=response)
+
+        result = await list_compliance_profiles(mock_app_context, limit=150)
+
+        assert "count" in result
+        mock_app_context.http.get.assert_called_once()
+        call_args = mock_app_context.http.get.call_args
+        assert call_args[1]["params"]["top"] == 150
+
+    @pytest.mark.asyncio
+    async def test_list_compliance_profiles_invalid_limit(self, mock_app_context):
+        """Test listing compliance profiles with invalid limit."""
+        result = await list_compliance_profiles(mock_app_context, limit=300)
+
+        assert "error" in result
+        assert result["error"]["code"] == "InvalidInput"
+        assert "50 and 200" in result["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_scan_template_with_profile(self, mock_app_context, tmp_path):
+        """Test scanning template with compliance profile."""
+        template_file = tmp_path / "template.yaml"
+        template_file.write_text("Resources:\n  Bucket:\n    Type: AWS::S3::Bucket")
+
+        request = httpx.Request("POST", "https://api.xdr.trendmicro.com/beta/cloudPosture/scanTemplate")
+        response = httpx.Response(
+            200,
+            json={
+                "findings": [
+                    {
+                        "riskLevel": "HIGH",
+                        "ruleId": "S3-001",
+                        "description": "S3 bucket public access not blocked",
+                        "complianceStandards": [
+                            {"id": "CIS-V8"},
+                            {"id": "NIST4"},
+                            {"id": "AWAF-2025"}
+                        ]
+                    }
+                ]
+            },
+            request=request,
+        )
+        mock_app_context.http.post = AsyncMock(return_value=response)
+
+        result = await scan_template(
+            mock_app_context,
+            file_path=str(template_file),
+            template_type="cloudformation-template",
+            profile_id="3PfYLfW",
+        )
+
+        assert "findings" in result
+        assert len(result["findings"]) == 1
+        assert "complianceStandards" in result["findings"][0]
+        assert len(result["findings"][0]["complianceStandards"]) == 3
+        assert result["findings"][0]["complianceStandards"][0]["id"] == "CIS-V8"
+
+        # Verify profile_id was passed in request body
+        call_args = mock_app_context.http.post.call_args
+        assert call_args[1]["json"]["profileId"] == "3PfYLfW"
+
+    @pytest.mark.asyncio
+    async def test_scan_terraform_archive_with_profile(self, mock_app_context, tmp_path):
+        """Test scanning Terraform archive with compliance profile."""
+        archive_file = tmp_path / "terraform.zip"
+        archive_file.write_bytes(b"PK\x03\x04")
+
+        request = httpx.Request("POST", "https://api.xdr.trendmicro.com/beta/cloudPosture/scanTemplateArchive")
+        response = httpx.Response(
+            200,
+            json={
+                "findings": [
+                    {
+                        "riskLevel": "MEDIUM",
+                        "ruleId": "TF-005",
+                        "complianceStandards": [
+                            {"id": "CIS-V8"}
+                        ]
+                    }
+                ]
+            },
+            request=request,
+        )
+        mock_app_context.http.post = AsyncMock(return_value=response)
+
+        result = await scan_terraform_archive(
+            mock_app_context,
+            file_path=str(archive_file),
+            profile_id="3PfYLfW",
+        )
+
+        assert "findings" in result
+        assert result["findings"][0]["complianceStandards"][0]["id"] == "CIS-V8"
+
+        # Verify profile_id was passed in request data
+        call_args = mock_app_context.http.post.call_args
+        assert call_args[1]["data"]["profileId"] == "3PfYLfW"

@@ -144,12 +144,17 @@ Extract and check ALL of these IOC types from source code, configs, scripts, bui
 
 **Do NOT skip IOCs because they "look safe"** — many legitimate-looking values are malicious.
 
-### 4. IAC TEMPLATE SCAN — scan every infrastructure template
+### 4. IAC TEMPLATE SCAN — scan every infrastructure template with compliance mapping
 Find ALL CloudFormation files (.yaml, .json, .template) and Terraform files (.tf, .tf.json).
 → For CloudFormation: run `scan_iac_template` with type "cloudformation-template" on each.
 → For Terraform plan JSON: run `scan_iac_template` with type "terraform-template".
 → For Terraform HCL directories: ZIP the .tf files and run `scan_terraform_archive`.
-→ Report: all findings with status FAILURE, grouped by risk level.
+→ **COMPLIANCE MAPPING**: Each finding automatically includes complianceStandards array showing \
+which regulatory requirements it violates (CIS, NIST, AWS Well-Architected, PCI-DSS, etc.). \
+ALWAYS report these for HIGH/EXTREME findings.
+→ If user mentions specific compliance framework (e.g., "scan against CIS" or "check PCI compliance"), \
+use `list_compliance_profiles` to find the profile ID, then pass profile_id parameter to scan function.
+→ Report: all findings with status FAILURE, grouped by risk level, compliance violations for critical findings.
 
 ### 5. ARTIFACT SCAN — scan for vulnerabilities, malware, and secrets (ALWAYS RUN)
 **ALWAYS run this on every project with code dependencies or container images.** Use TMAS to scan for:
@@ -427,10 +432,46 @@ async def get_submission_quota(ctx: Context) -> dict:
 
 
 @mcp.tool()
+async def list_compliance_standards(ctx: Context) -> dict:
+    """List all available compliance standards for IaC scanning.
+
+    Returns compliance frameworks like CIS Benchmarks, NIST, AWS Well-Architected,
+    PCI-DSS, HIPAA, ISO 27001, etc. Use this to discover which compliance frameworks
+    are available and to understand which standards a finding violates.
+
+    Each finding from scan_iac_template() includes a complianceStandards array
+    showing which frameworks it violates (automatically, without needing to specify
+    a profile).
+
+    Use this when the user asks about compliance capabilities or wants to know
+    which standards are available.
+    """
+    return await iac_scanner.list_compliance_standards(_ctx(ctx))
+
+
+@mcp.tool()
+async def list_compliance_profiles(ctx: Context, limit: int = 100) -> dict:
+    """List available compliance profiles for IaC scanning.
+
+    Compliance profiles group rules by framework (CIS, NIST, etc.) and can be
+    used to scan templates against specific compliance requirements. Each profile
+    has a unique ID that can be passed to scan_iac_template() for targeted scanning.
+
+    Use this when the user asks to scan against a specific compliance framework
+    (e.g., "scan against CIS benchmarks") to find the appropriate profile ID.
+
+    Args:
+        limit: Maximum profiles to return (50-200, default 100).
+    """
+    return await iac_scanner.list_compliance_profiles(_ctx(ctx), limit)
+
+
+@mcp.tool()
 async def scan_iac_template(
     ctx: Context,
     file_path: str,
     template_type: str,
+    profile_id: str | None = None,
 ) -> dict:
     """Scan a CloudFormation or Terraform template for security misconfigurations.
 
@@ -438,29 +479,43 @@ async def scan_iac_template(
     standards, best practices, and common misconfigurations. Returns findings with
     risk levels (LOW to EXTREME), affected resources, and remediation links.
 
+    **COMPLIANCE MAPPING:** Each finding automatically includes a complianceStandards
+    array showing which regulatory requirements it violates (CIS, NIST, AWS
+    Well-Architected, etc.). This helps prioritize remediation based on compliance
+    obligations.
+
     Use this whenever you create or modify CloudFormation or Terraform templates.
 
     Args:
         file_path: Absolute path to the template file.
         template_type: One of: cloudformation-template (YAML/JSON), terraform-template (Terraform plan JSON).
+        profile_id: Optional compliance profile ID to scan against specific framework
+                   rules. Use list_compliance_profiles() to find available profiles.
+                   If omitted, uses default rules but still returns compliance mappings.
     """
-    return await iac_scanner.scan_template(_ctx(ctx), file_path, template_type)
+    return await iac_scanner.scan_template(_ctx(ctx), file_path, template_type, profile_id)
 
 
 @mcp.tool()
 async def scan_terraform_archive(
     ctx: Context,
     file_path: str,
+    profile_id: str | None = None,
 ) -> dict:
     """Scan a ZIP archive containing Terraform HCL (.tf) files for security issues.
 
     Scans Terraform configurations with a single root module inside the ZIP.
     Returns findings with risk levels, affected resources, and remediation links.
 
+    **COMPLIANCE MAPPING:** Each finding automatically includes a complianceStandards
+    array showing which regulatory requirements it violates.
+
     Args:
         file_path: Absolute path to the ZIP file containing .tf files.
+        profile_id: Optional compliance profile ID for targeted compliance scanning.
+                   Use list_compliance_profiles() to find available profiles.
     """
-    return await iac_scanner.scan_terraform_archive(_ctx(ctx), file_path)
+    return await iac_scanner.scan_terraform_archive(_ctx(ctx), file_path, profile_id)
 
 
 # --- Vulnerability Management ---
@@ -1210,18 +1265,23 @@ def scan_infrastructure(project_path: str = ".") -> str:
 
     **USE THIS WHEN:** User asks to "check this template", "scan CloudFormation",
     "scan Terraform", "IaC security", "check infrastructure code",
-    "validate this template".
+    "validate this template", "scan against CIS", "check compliance",
+    "PCI-DSS scan", "NIST validation".
 
-    **TOOLS USED:** scan_iac_template, scan_terraform_archive
+    **TOOLS USED:** scan_iac_template, scan_terraform_archive,
+                    list_compliance_standards (optional),
+                    list_compliance_profiles (when specific framework mentioned)
 
     Scans CloudFormation and Terraform templates against hundreds of security
     rules covering compliance standards, best practices, and misconfigurations.
+    **AUTOMATICALLY maps findings to ALL applicable compliance frameworks**
+    (CIS, NIST, AWS Well-Architected, PCI-DSS, etc.) without needing to specify.
     """
     return f"""Scan Infrastructure as Code templates in {project_path} for security issues
 
 ## What this does
 Validates IaC templates against:
-- **Compliance standards**: CIS, PCI-DSS, HIPAA, GDPR, SOC 2, NIST
+- **Compliance standards**: CIS, PCI-DSS, HIPAA, GDPR, SOC 2, NIST, AWS Well-Architected
 - **Best practices**: Least privilege, encryption, logging, monitoring
 - **Common misconfigurations**: Public S3 buckets, open security groups, weak IAM policies
 
@@ -1242,27 +1302,38 @@ Search {project_path} for:
 - Terraform HCL: *.tf, *.tf.json files
   - Look in: terraform/, tf/, infrastructure/, modules/
 
-## Step 2: Scan CloudFormation templates
+## Step 2: Check for specific compliance framework request (optional)
+If user mentions a specific compliance framework (e.g., "scan against CIS", "check PCI compliance"):
+→ Use `list_compliance_profiles` to find available profiles.
+→ Extract the profile_id for the requested framework.
+→ Pass profile_id parameter to scan functions in next steps.
+
+If no specific framework mentioned, skip this step — scans will still return compliance mappings.
+
+## Step 3: Scan CloudFormation templates
 For EACH CloudFormation template file:
 → Use `scan_iac_template` with:
   - file_path = absolute path to template
   - template_type = "cloudformation-template"
-→ Returns findings with status PASS or FAILURE.
+  - profile_id = profile ID if user requested specific framework, else omit
+→ Returns findings with status PASS or FAILURE, plus complianceStandards array.
 
-## Step 3: Scan Terraform plan JSON
+## Step 4: Scan Terraform plan JSON
 For EACH Terraform plan JSON file:
 → Use `scan_iac_template` with:
   - file_path = absolute path to plan JSON
   - template_type = "terraform-template"
+  - profile_id = profile ID if specified, else omit
 
-## Step 4: Scan Terraform HCL files
+## Step 5: Scan Terraform HCL files
 If .tf files are found:
 → Create a ZIP archive containing all .tf files from the same root module.
 → Use `scan_terraform_archive` with:
   - file_path = absolute path to ZIP file
+  - profile_id = profile ID if specified, else omit
 → Only supports single root module per ZIP.
 
-## Step 5: Analyze findings
+## Step 6: Analyze findings and compliance violations
 Parse scan results for EACH template:
 - **status**: PASS (no issues) or FAILURE (issues found)
 - **findings**: List of security issues detected
@@ -1272,7 +1343,7 @@ Parse scan results for EACH template:
   - **resource**: Which template resource is affected
   - **remediationLink**: How to fix it (documentation URL)
 
-## Step 6: Report
+## Step 7: Report with compliance mapping
 For EACH template scanned:
 - Template file path and type
 - Scan status (PASS/FAILURE)
@@ -1281,6 +1352,13 @@ For EACH template scanned:
   - HIGH risk issues (fix before deployment)
   - MEDIUM risk issues (should fix)
   - LOW risk issues (nice to fix)
+- For each HIGH/EXTREME finding:
+  - Rule ID and title
+  - Affected resource(s)
+  - Risk description
+  - **Compliance violations**: List ALL compliance standards this violates
+    from the complianceStandards array (e.g., "Violates: CIS-V8, NIST4, AWAF-2025")
+  - Remediation link
 - For each finding:
   - Rule name and severity
   - Description of the issue

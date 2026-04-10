@@ -26,13 +26,15 @@ No APIs to learn, no commands to memorize. Simply ask your AI assistant (Claude,
 - _"Does this URL look suspicious?"_
 - _"Find any secrets in my code"_
 - _"Review this CloudFormation template for security issues"_
+- _"Scan this template against CIS benchmarks"_ (compliance-specific scanning)
+- _"What compliance standards does this violate?"_ (automatic compliance mapping)
 - _"Test my chatbot for security vulnerabilities"_ (auto-detects LLMs and tests for jailbreaks, prompt injection)
 
 Your AI assistant automatically uses v1vibe's security tools to scan files, check dependencies, analyze URLs, search threat intelligence, and generate a comprehensive security report — all in seconds.
 
 **You don't run v1vibe directly.** It's an MCP server that runs in the background, giving your AI assistant enterprise-grade security capabilities through simple conversation.
 
-## Features (16 tools)
+## Features (18 tools)
 
 ### 🤖 AI Content Safety (Runtime Guardrails)
 | Tool | What it does |
@@ -77,11 +79,17 @@ Your AI assistant automatically uses v1vibe's security tools to scan files, chec
 **Additional options:**
 - Pass extra TMAS CLI arguments via `additional_args` (e.g., `--region us-east-1`)
 
-### ☁️ Infrastructure as Code Scanning
+### ☁️ Infrastructure as Code Scanning with Compliance Mapping
 | Tool | What it does |
 |------|-------------|
-| `scan_iac_template` | Scan CloudFormation (YAML/JSON) or Terraform plan (JSON) for security misconfigurations |
-| `scan_terraform_archive` | Scan ZIP of Terraform HCL (.tf) files for security misconfigurations |
+| `list_compliance_standards` | List available compliance frameworks (CIS Benchmarks, NIST, PCI-DSS, HIPAA, AWS Well-Architected, etc.) |
+| `list_compliance_profiles` | List compliance profiles for targeted scanning (returns profile IDs for specific frameworks) |
+| `scan_iac_template` | Scan CloudFormation (YAML/JSON) or Terraform plan (JSON) for security misconfigurations. **Automatically maps each finding to ALL applicable compliance standards** (shows which CIS/NIST/PCI-DSS controls are violated). Optional: scan against specific compliance profile. |
+| `scan_terraform_archive` | Scan ZIP of Terraform HCL (.tf) files for security misconfigurations with automatic compliance mapping |
+
+**Compliance Mapping** (automatic): Every finding includes a `complianceStandards` array showing which regulatory requirements it violates across ALL frameworks (CIS, NIST, AWS Well-Architected, PCI-DSS, HIPAA, ISO 27001, etc.). No configuration needed - just scan your templates and get compliance context automatically.
+
+**Targeted Scanning** (optional): Scan against a specific compliance profile (e.g., CIS AWS Foundations) by passing a `profile_id` parameter. Use `list_compliance_profiles()` to find available profiles.
 
 ### 🔎 Threat Intelligence
 | Tool | What it does |
@@ -232,6 +240,44 @@ v1vibe test
 ```
 
 **Supported regions:** `us-east-1`, `eu-central-1`, `ap-southeast-1`, `ap-northeast-1`, `ap-southeast-2`, `ap-south-1`, `me-south-1`, `eu-west-2`, `ca-central-1`
+
+## Upgrading
+
+To upgrade v1vibe to the latest version:
+
+```bash
+# If installed with uv (recommended)
+uv tool upgrade v1vibe
+
+# If installed with pipx
+pipx upgrade v1vibe
+
+# If installed with pip
+pip install --upgrade v1vibe
+```
+
+**For GitHub installs:**
+```bash
+# uv
+uv tool upgrade --reinstall v1vibe
+
+# pipx
+pipx upgrade --force v1vibe
+
+# pip
+pip install --upgrade --force-reinstall git+https://github.com/arcaniusdev/v1vibe.git
+```
+
+**After upgrading:**
+1. Your configuration (`~/.v1vibe/config.json`) and threat feed cache are preserved
+2. TMAS CLI binary is automatically updated if needed
+3. MCP server registration remains intact
+4. Run `v1vibe status` to verify the new version
+
+**Check your current version:**
+```bash
+v1vibe --version  # or v1vibe status
+```
 
 ## Uninstalling
 

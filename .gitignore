@@ -22,6 +22,12 @@ docs/
 # Test files (root level only - exclude temporary session tests)
 /test_*.py
 
+# Compliance demo files (temporary test artifacts)
+/compliance_demo_files/
+
+# AI Scanner demo files (temporary test artifacts)
+/ai_scanner_demo_files/
+
 # Test coverage
 .coverage
 coverage.json
