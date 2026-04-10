@@ -1,11 +1,12 @@
 """FastMCP server implementing v1vibe security tools.
 
-Provides 13 security tools and 10 workflow prompts for AI coding assistants:
+Provides 15 security tools and 11 workflow prompts for AI coding assistants:
 - File/URL malware detection and behavioral analysis
 - Dependency vulnerability and secret scanning
 - Infrastructure as Code validation
 - Threat intelligence lookups
 - AI content safety checks
+- LLM/AI endpoint vulnerability testing
 
 All tools are thin async wrappers that delegate to tool modules in tools/.
 The server includes comprehensive instructions for AI clients via SERVER_INSTRUCTIONS.
@@ -18,6 +19,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from v1vibe.clients import AppContext, app_lifespan
 from v1vibe.tools import (
     ai_guard,
+    ai_scanner,
     artifact_scanner,
     file_security,
     iac_scanner,
@@ -49,11 +51,18 @@ Use v1vibe when the user says ANY of the following (or anything similar):
 - "threat check", "threat assessment", "look up this hash/IP/domain"
 - "pentest", "harden this", "secure this"
 - "scan this template", "check this CloudFormation", "check this Terraform", "IaC scan"
+- "test my LLM", "test my AI", "AI Scanner", "scan my chatbot", "test AI security"
+- "jailbreak test", "prompt injection test", "red team my AI", "AI vulnerabilities"
 - "Vision One", "v1vibe", "TMAS", "artifact scanner"
 
 **Default behavior**: When the user asks you to "review" a project and the context is \
 security (not just code style or functionality), use v1vibe and run the full checklist. \
 When in doubt, USE v1vibe. Scanning and finding nothing is always better than skipping.
+
+**AI Scanner modes:**
+- **Automated (default)**: Use `detect_llm_usage` → `scan_llm_endpoint` for security reviews
+- **Interactive (explicit only)**: Use `scan_llm_interactive` ONLY when user explicitly asks for \
+  "interactive mode" or "wizard". This blocks execution and requires manual terminal input.
 
 ## MANDATORY CHECKLIST — Do ALL of these, not just some
 
@@ -533,6 +542,120 @@ async def scan_artifact(
     return await artifact_scanner.scan_artifact(_ctx(ctx), artifact, scan_types, additional_args)
 
 
+# --- AI Scanner (LLM Vulnerability Testing) ---
+
+
+@mcp.tool()
+async def detect_llm_usage(
+    ctx: Context,
+    project_path: str = ".",
+) -> list[dict]:
+    """Auto-detect LLM/AI usage in a project for security testing.
+
+    Scans project code to find LLM API calls (OpenAI, Anthropic, Google, etc.)
+    and extracts configuration details. Use this BEFORE scan_llm_endpoint to
+    automatically discover what needs testing.
+
+    Returns detected LLM usage with endpoints, models, and required API keys.
+    This enables fully automated AI security testing without manual configuration.
+
+    Args:
+        project_path: Path to project directory to scan (default: current directory)
+
+    Returns:
+        List of detected LLM usages with provider, endpoint, model, env vars, files.
+        Empty list if no LLM usage found.
+    """
+    return await ai_scanner.detect_llm_usage(project_path)
+
+
+@mcp.tool()
+async def scan_llm_interactive(
+    ctx: Context,
+    region: str | None = None,
+    config_file: str | None = None,
+) -> dict:
+    """Scan an LLM endpoint for vulnerabilities (MANUAL MODE - interactive wizard).
+
+    ⚠️ ONLY use this when user EXPLICITLY asks for "interactive mode" or "wizard".
+    For automated scans, use detect_llm_usage + scan_llm_endpoint instead.
+
+    Launches an interactive wizard that requires manual input. Use this for:
+    - Ad-hoc testing outside of security reviews
+    - Custom/complex LLM configurations not auto-detectable
+    - User explicitly requests interactive/manual configuration
+
+    The wizard will prompt the USER (not you) for:
+    - Group name for the scan
+    - Target API endpoint
+    - Model API key
+    - JSON request/response structure
+    - Attack configuration
+
+    This blocks execution and requires terminal interaction.
+
+    Args:
+        region: Optional Vision One region override (defaults to configured region)
+        config_file: Optional path to saved scan configuration for reuse
+
+    Returns:
+        Scan results with vulnerabilities found, attack success rates, and
+        detailed findings by attack type.
+    """
+    return await ai_scanner.scan_llm_interactive(_ctx(ctx), region, config_file)
+
+
+@mcp.tool()
+async def scan_llm_endpoint(
+    ctx: Context,
+    endpoint_url: str,
+    model_name: str | None = None,
+    api_key: str | None = None,
+    region: str | None = None,
+    attack_objectives: list[str] | None = None,
+    output_file: str | None = None,
+) -> dict:
+    """Scan an LLM endpoint for vulnerabilities (PRIMARY AUTOMATED MODE).
+
+    ✅ This is the PRIMARY tool for AI security testing. Use this for all
+    automated scans, security reviews, and CI/CD integration.
+
+    Tests an AI/LLM endpoint for jailbreaks, prompt injection, data exfiltration,
+    and other AI-specific attack techniques. Fully automated - no user interaction.
+
+    Workflow:
+    1. Use detect_llm_usage() to find LLM calls in project code
+    2. Extract endpoint, model from detection results
+    3. Ask user for API key (e.g., "Please provide OPENAI_API_KEY for testing")
+    4. Call this tool with detected configuration
+    5. Report results
+
+    Use when:
+    - Security reviews with detected LLM usage
+    - Automating AI security testing in CI/CD
+    - Testing before production deployment
+    - Regression testing after model updates
+    - ANY time you need to test an LLM for vulnerabilities
+
+    Args:
+        endpoint_url: Target LLM API endpoint (e.g., https://api.openai.com/v1/chat/completions)
+        model_name: Model identifier (e.g., gpt-4, claude-3-opus). Optional if endpoint has default.
+        api_key: API key for target LLM. If None, looks in environment (OPENAI_API_KEY, etc.)
+        region: Optional Vision One region override (defaults to configured region)
+        attack_objectives: Attack types to test. If None, uses comprehensive defaults:
+                          ["jailbreak", "prompt_injection", "data_exfiltration",
+                           "toxic_content", "model_manipulation"]
+        output_file: Optional path to save detailed JSON results
+
+    Returns:
+        Scan results with vulnerabilities found, attack success rates, and
+        detailed findings by attack type.
+    """
+    return await ai_scanner.scan_llm_endpoint(
+        _ctx(ctx), endpoint_url, model_name, api_key, region, attack_objectives, output_file
+    )
+
+
 # ═══════════════════════════════════════════════
 # MCP Prompts — workflow templates for AI clients
 # ═══════════════════════════════════════════════
@@ -600,11 +723,18 @@ For any HIGH or CRITICAL CVEs from step 5:
 → Use `get_cve_details` for each CVE ID.
 → Report: CVSS score, description, mitigation options, patch availability, affected assets.
 
-## Step 7: AI CONTENT SAFETY (conditional)
-**Only if project contains AI prompts/chatbot code/LLM templates.**
-→ Use `ai_guard_evaluate` on each prompt/template.
-→ Report: Allow/Block action, harmful categories, PII detected, prompt injection risk.
-→ Skip if no AI content present.
+## Step 7: AI SECURITY (conditional - auto-detect)
+**Auto-detect LLM usage and test for vulnerabilities:**
+→ Use `detect_llm_usage` to find LLM API calls (OpenAI, Anthropic, Google, etc.).
+→ If LLM usage detected:
+   a) Show user what was found: provider, endpoint, model, files
+   b) Explain credit cost (800 credits per 5K API calls)
+   c) Ask user: "Test [Provider] [Model] for jailbreaks/prompt injection? (Y/n)"
+   d) If yes, ask for API key: "Please provide [ENV_VAR] for testing: "
+   e) Use `scan_llm_endpoint` with detected endpoint/model + user's API key
+   f) Report: vulnerabilities found, attack success rates, risk level
+→ If NO LLM usage detected, skip this step.
+→ Optional: Use `ai_guard_evaluate` on static AI prompts/templates if present.
 
 ## Step 8: FINAL REPORT
 Structured summary with:
@@ -614,7 +744,8 @@ Structured summary with:
 - IaC misconfigurations by risk level
 - Dependency CVEs, malware in packages, exposed secrets
 - CVE details for critical vulnerabilities
-- AI Guard results (if applicable)
+- AI Scanner results (if LLM usage detected and tested)
+- AI Guard results (if static AI content evaluated)
 - Prioritized remediation recommendations
 - Suggestions for deeper analysis (sandbox suspicious files/URLs)"""
 
@@ -1342,6 +1473,197 @@ BEFORE:
 - Large project security reviews
 
 This helps avoid hitting quota limits mid-scan."""
+
+
+@mcp.prompt()
+def test_ai_security(
+    project_path: str = ".",
+) -> str:
+    """Test LLM/AI endpoints for security vulnerabilities (auto-detect + test).
+
+    **USE THIS WHEN:** User asks to "test my LLM", "test my AI", "AI Scanner",
+    "scan my chatbot", "test AI security", "jailbreak test", "prompt injection test",
+    "red team my AI", "check AI vulnerabilities", "pentest my chatbot".
+
+    **TOOLS USED:** detect_llm_usage, scan_llm_endpoint, (scan_llm_interactive only if explicitly requested)
+
+    Offensive security testing for LLM applications. Auto-detects LLM usage in code,
+    then tests for jailbreaks, prompt injection, data exfiltration, and other
+    AI-specific attack techniques.
+    """
+
+    return f"""Test AI/LLM endpoint security using TrendAI AI Scanner
+
+**Project Path:** {project_path}
+
+**Mode:** Automated (auto-detect LLM usage, then test)
+
+## What AI Scanner Tests
+
+AI Scanner performs **offensive security testing** against your LLM to find vulnerabilities:
+
+**Attack Objectives:**
+- **Jailbreak**: Bypass safety guardrails and restrictions
+- **Prompt Injection**: Manipulate system prompts and instructions
+- **Data Exfiltration**: Extract training data or system information
+- **Toxic Content**: Generate harmful, offensive, or dangerous content
+- **Model Manipulation**: Confuse or degrade model behavior
+- **Privilege Escalation**: Gain unauthorized access or capabilities
+
+**Attack Techniques:**
+- Direct attacks (explicit malicious prompts)
+- Indirect attacks (hidden instructions, encoding tricks)
+- Multi-turn attacks (build up over conversation)
+- Context manipulation (poison conversation history)
+- And more...
+
+## When to Use AI Scanner
+
+**ALWAYS test BEFORE production deployment:**
+- New LLM-powered features or chatbots
+- Updated AI models or configurations
+- Changes to system prompts or guardrails
+- New training data or fine-tuned models
+
+**Regular testing:**
+- Scheduled security scans (weekly/monthly)
+- After security incidents or near-misses
+- Compliance validation for AI governance
+- Red team exercises
+
+**Use Cases:**
+- Customer-facing chatbots
+- AI assistants with access to sensitive data
+- Code generation tools
+- Content moderation AI
+- AI-powered decision systems
+
+## Step 1: Auto-Detect LLM Usage
+
+→ Use `detect_llm_usage` to find LLM API calls in the project
+→ This scans Python files for:
+   - OpenAI imports and API calls (gpt-4, gpt-3.5-turbo, etc.)
+   - Anthropic imports and API calls (claude-3-opus, claude-3-sonnet, etc.)
+   - Google Generative AI imports (gemini-pro, palm-2, etc.)
+   - Custom LLM endpoints
+
+→ Returns for each detected provider:
+   - Provider name (e.g., "OpenAI")
+   - Endpoint URL (e.g., "https://api.openai.com/v1/chat/completions")
+   - Model name (e.g., "gpt-4")
+   - Required environment variable (e.g., "OPENAI_API_KEY")
+   - Files containing LLM calls
+   - Confidence level (high/medium/low)
+
+## Step 2: Ask User for Confirmation
+
+**If LLM usage detected:**
+Show the user what was found and ask for confirmation:
+
+"I detected [Provider] [Model] usage in your code:
+ - Endpoint: [endpoint_url]
+ - Model: [model_name]
+ - Files: [file1.py, file2.py, ...]
+
+Testing for jailbreaks, prompt injection, and data exfiltration will cost ~800 credits.
+Proceed with AI Scanner test? (Y/n)"
+
+**If NO LLM usage detected:**
+"No LLM usage detected in this project. AI Scanner testing not applicable."
+Skip to Step 5 (or end).
+
+## Step 3: Get API Key
+
+If user confirms, ask for the required API key:
+
+"Please provide your [ENV_VAR] for testing (will not be stored):
+ → This is the API key for the LLM being tested, not your Vision One API key
+ → Example: If testing OpenAI, provide your OPENAI_API_KEY"
+
+Wait for user to provide the key.
+
+## Step 4: Run Automated Scan
+
+Use `scan_llm_endpoint` with auto-detected configuration:
+```
+scan_llm_endpoint(
+    endpoint_url=detected.endpoint,
+    model_name=detected.model,
+    api_key=user_provided_key,
+    attack_objectives=None  # Uses comprehensive defaults
+)
+```
+
+This tests for ALL attack types automatically:
+- Jailbreak attempts
+- Prompt injection
+- Data exfiltration
+- Toxic content generation
+- Model manipulation
+- Privilege escalation
+
+## Step 5: Analyze Results
+
+Results include:
+- **Total tests**: Number of attack attempts made
+- **Vulnerabilities found**: Count of successful attacks
+- **Attack success rate**: Percentage of attacks that succeeded
+- **Findings by objective**: Detailed breakdown per attack type
+- **Risk scoring**: Severity ratings for each vulnerability
+
+**Look for:**
+- High attack success rates (>10% is concerning)
+- Critical vulnerabilities (jailbreaks, data exfiltration)
+- Patterns in successful attacks (weak guardrails)
+- Unexpected behaviors (model confusion, hallucinations)
+
+## Step 6: View in Vision One
+
+Navigate to **AI Application Security → AI Security Blueprint → View AI Scanner results**
+
+Dashboard shows:
+- Historical scan results and trends
+- Vulnerability comparisons across models
+- Attack technique effectiveness
+- Compliance status and recommendations
+
+## Step 7: Remediation
+
+Based on findings:
+1. **Strengthen guardrails**: Update system prompts, add filters
+2. **Re-test**: Run scan again after fixes to verify improvements
+3. **Monitor**: Set up AI Guard for runtime protection (see ai_guard_evaluate tool)
+4. **Document**: Track vulnerabilities and mitigations for compliance
+
+## Alternative: Manual/Interactive Mode
+
+**ONLY use interactive mode when:**
+- User explicitly requests "interactive mode" or "wizard"
+- Custom/complex LLM configuration not auto-detectable
+- Testing LLM endpoint NOT in the project code
+
+**To use interactive mode:**
+```
+scan_llm_interactive(region="us-east-1")
+```
+
+This launches a wizard that requires manual terminal input for all configuration.
+**DO NOT use this for automated security reviews** - it blocks execution.
+
+## Important Notes
+
+- **Cost**: 800 credits per 5,000 daily API calls (Trend-hosted)
+- **Duration**: Scans can take 30-60 minutes depending on attack configuration
+- **API Key Security**: Model API keys are used only for testing, not stored by Vision One
+- **Safe Testing**: AI Scanner tests are designed to be safe and non-destructive
+- **Complementary to AI Guard**: AI Scanner = pre-deployment testing, AI Guard = runtime protection
+
+## Example Automated Workflow
+
+1. **Development**: Auto-detect LLM usage, test with AI Scanner
+2. **CI/CD**: Add detect_llm_usage + scan_llm_endpoint to automated test suite
+3. **Production**: Enable AI Guard for runtime monitoring (ai_guard_evaluate)
+4. **Monthly**: Re-run auto-detection and AI Scanner to catch new attack vectors"""
 
 
 if __name__ == "__main__":

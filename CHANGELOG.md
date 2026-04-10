@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **AI Scanner (LLM Vulnerability Testing)**: New offensive security testing for AI/LLM applications
+  - `detect_llm_usage` tool: Auto-detects LLM usage in code (OpenAI, Anthropic, Google, custom endpoints)
+  - `scan_llm_endpoint` tool: PRIMARY automated testing tool for security reviews and CI/CD
+  - `scan_llm_interactive` tool: Optional manual wizard (only when user explicitly requests)
+  - Fully automated workflow: auto-detect → ask user for API key → test → report
+  - Tests for jailbreaks, prompt injection, data exfiltration, toxic content, model manipulation
+  - Supports any LLM endpoint: OpenAI, Anthropic, Claude, Gemini, custom models
+  - Results viewable in Vision One AI Security Blueprint dashboard
+  - New MCP prompt `test_ai_security` with auto-detection workflow
+  - Integrated into `security_review` prompt (Step 7: AI Security auto-detection)
+  - Complements existing `ai_guard_evaluate` (AI Guard = runtime protection, AI Scanner = pre-deployment testing)
+
 - **Enhanced Error Messages**: Artifact scanner now provides actionable suggestions when scans fail
   - Malware scanning errors now explain the container-only limitation and suggest using `scan_file`
   - Symlink errors provide 4 specific workarounds (scan subdirectories, split scan types, move .venv, use scan_file)
@@ -46,8 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Core Features
-- FastMCP server with 13 security tools for AI coding assistants
-- 4 MCP workflow prompts (security_review, scan_project, check_urls, check_dependencies)
+- FastMCP server with 15 security tools for AI coding assistants (13 in v0.1.0, +2 AI Scanner tools added post-release)
+- 11 MCP workflow prompts for comprehensive security workflows
 - Interactive CLI with setup wizard, test, status, and uninstall commands
 - Configuration management via environment variables or `~/.v1vibe/config.json`
 - Support for 9 TrendAI Vision One regions
