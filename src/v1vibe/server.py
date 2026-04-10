@@ -74,7 +74,7 @@ This is a fast, cached lookup (instant) — there is NO reason to skip any IOC.
 Extract and check ALL of these IOC types from source code, configs, scripts, build files:
 
 1. **Domains, URLs, IPs** (most common)
-   - Search pattern: `https?://[^\s]+`, `[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}`, domain patterns
+   - Search pattern: `https?://[^\\s]+`, `[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}`, domain patterns
    - Where: API endpoints, CDN URLs, external services, hardcoded addresses in code
    - Files to scan: ALL source code, configs, .env.example, README, package files, Dockerfiles, IaC templates
    - How: Use Grep with URL/IP regex patterns, then extract unique values
@@ -88,14 +88,14 @@ Extract and check ALL of these IOC types from source code, configs, scripts, bui
    - Check: Every hash found (even if it looks like a dependency checksum - could be trojaned)
 
 3. **Email addresses**
-   - Search pattern: `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`
+   - Search pattern: `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}`
    - Where: Sender/recipient configs, contact lists, SMTP settings, notification configs
    - Files to scan: configs, templates, .env files, CI/CD configs, alerting rules, source code
    - How: Use Grep for email regex pattern
    - Check: Every email address (sender and recipient)
 
 4. **Windows registry keys**
-   - Search pattern: `HKEY_[A-Z_]+\\`, registry key paths
+   - Search pattern: `HKEY_[A-Z_]+\\\\`, registry key paths
    - Where: PowerShell scripts, batch files, installers, uninstallers, Windows configs
    - Files to scan: .ps1, .bat, .cmd, .reg files, install/uninstall scripts
    - How: Use Grep for `HKEY_` or Read PowerShell scripts
@@ -109,11 +109,11 @@ Extract and check ALL of these IOC types from source code, configs, scripts, bui
    - Check: Every mutex name (including GUIDs in braces)
 
 6. **File paths** (system/installation paths)
-   - Search pattern: Windows paths `C:\\`, `%[A-Z]+%`, Unix paths `/tmp/`, `/var/`, `~/`
+   - Search pattern: Windows paths `C:\\\\`, `%[A-Z]+%`, Unix paths `/tmp/`, `/var/`, `~/`
    - Where: Installation directories, temp paths, hardcoded system paths in scripts
    - Files to scan: Install scripts, deployment configs, path constants in code
-   - How: Grep for path patterns (C:\\, /tmp/, /var/, AppData, ProgramData)
-   - Check: System paths like C:\Users\..., /tmp/, /var/, AppData paths, /etc/ paths
+   - How: Grep for path patterns (C:\\\\, /tmp/, /var/, AppData, ProgramData)
+   - Check: System paths like C:\\Users\\..., /tmp/, /var/, AppData paths, /etc/ paths
 
 **For EACH unique IOC found:**
 → Run `search_threat_indicators` with the IOC value (instant lookup against cached global threat feed)
