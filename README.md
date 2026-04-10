@@ -3,7 +3,8 @@
 A comprehensive security validation MCP server powered by [TrendAI Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Provides AI coding assistants with real-time security scanning across **files, dependencies, containers, infrastructure, URLs, and AI content** — all from within your coding workflow.
 
 **What it does:**
-- 🤖 **AI Safety** — Validate AI prompts and chatbot content for harmful content and prompt injection
+- 🤖 **AI Safety** — Validate AI prompts and chatbot content for harmful content and prompt injection (runtime guardrails)
+- 🧪 **AI Security Testing** — Auto-detect and test LLMs for vulnerabilities: jailbreaks, prompt injection, data exfiltration (pre-deployment testing)
 - 🦠 **Malware Detection** — Scan files and dependencies for trojans, ransomware, spyware
 - 🔍 **Dependency Security** — Find CVEs in 25+ package ecosystems (npm, pip, Maven, Go, Rust, etc.)
 - 🔐 **Secret Scanning** — Detect hardcoded credentials, API keys, tokens in code
@@ -25,17 +26,25 @@ No APIs to learn, no commands to memorize. Simply ask your AI assistant (Claude,
 - _"Does this URL look suspicious?"_
 - _"Find any secrets in my code"_
 - _"Review this CloudFormation template for security issues"_
+- _"Test my chatbot for security vulnerabilities"_ (auto-detects LLMs and tests for jailbreaks, prompt injection)
 
 Your AI assistant automatically uses v1vibe's security tools to scan files, check dependencies, analyze URLs, search threat intelligence, and generate a comprehensive security report — all in seconds.
 
 **You don't run v1vibe directly.** It's an MCP server that runs in the background, giving your AI assistant enterprise-grade security capabilities through simple conversation.
 
-## Features (13 tools)
+## Features (16 tools)
 
-### 🤖 AI Content Safety
+### 🤖 AI Content Safety (Runtime Guardrails)
 | Tool | What it does |
 |------|-------------|
 | `ai_guard_evaluate` | Evaluate AI prompts, chatbot instructions, and LLM templates for harmful content, PII leakage, and prompt injection attacks |
+
+### 🧪 AI Security Testing (Pre-Deployment Vulnerability Testing)
+| Tool | What it does |
+|------|-------------|
+| `detect_llm_usage` | **Auto-detect LLM usage** in projects (OpenAI, Anthropic, Google, custom endpoints). Scans code for LLM imports, extracts endpoints, models, API keys. Use before `scan_llm_endpoint` for fully automated testing. |
+| `scan_llm_endpoint` | **PRIMARY automated LLM testing tool.** Tests endpoints for jailbreaks, prompt injection, data exfiltration, toxic content, model manipulation. Fully automated - no user interaction required. Use for security reviews and CI/CD. |
+| `scan_llm_interactive` | Manual wizard for LLM testing (ONLY when user explicitly requests interactive mode). Requires terminal interaction. |
 
 ### 🦠 Malware & File Security
 | Tool | What it does |
@@ -317,15 +326,16 @@ uv run v1vibe test
 ## Architecture
 
 - `src/v1vibe/cli.py` — CLI entry point: setup wizard (with TMAS install), test, status, uninstall
-- `src/v1vibe/server.py` — FastMCP server with 13 tools + 10 prompts
+- `src/v1vibe/server.py` — FastMCP server with 16 tools + 11 prompts
 - `src/v1vibe/config.py` — Settings, region mapping, config file I/O (includes TMAS path)
 - `src/v1vibe/clients.py` — gRPC + httpx client lifecycle (lifespan context)
 - `src/v1vibe/utils.py` — Error formatting, response helpers
 - `src/v1vibe/tools/` — Tool implementations:
   - `file_security.py` — File malware scanning (gRPC SDK)
   - `sandbox.py` — File/URL sandbox analysis (REST v3.0)
-  - `artifact_scanner.py` — **NEW:** Dependency/secret/container scanning (TMAS CLI wrapper)
+  - `artifact_scanner.py` — Dependency/secret/container scanning (TMAS CLI wrapper)
   - `ai_guard.py` — AI content safety (REST v3.0)
+  - `ai_scanner.py` — **NEW:** LLM vulnerability testing (TMAS CLI wrapper) - auto-detection, jailbreaks, prompt injection
   - `threat_intel.py` — Suspicious object lookup (REST v3.0)
   - `iac_scanner.py` — Infrastructure security (REST beta)
   - `vulnerabilities.py` — CVE details (REST v3.0)
