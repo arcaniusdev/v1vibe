@@ -12,7 +12,7 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 - 🔎 **Threat Intelligence** — Search global threat indicators (domains, IPs, URLs, file hashes, registry keys, mutexes, email addresses) from Trend Micro threat feed. Cached locally with hourly delta updates for instant lookups.
 - 🤖 **AI Safety** — Validate AI prompts and chatbot content for harmful content and prompt injection
 
-## Features (12 tools)
+## Features (13 tools)
 
 ### 🦠 Malware & File Security
 | Tool | What it does |
