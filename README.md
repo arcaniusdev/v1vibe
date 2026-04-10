@@ -100,7 +100,23 @@ Your AI assistant automatically uses v1vibe's security tools to scan files, chec
 
 ## Quick Start
 
-### Option 1: Install from source (recommended for now)
+### Option 1: Install directly from GitHub
+
+```bash
+# With uv (recommended)
+uv tool install git+https://github.com/arcaniusdev/v1vibe.git
+
+# Or with pipx
+pipx install git+https://github.com/arcaniusdev/v1vibe.git
+
+# Or with pip
+pip install git+https://github.com/arcaniusdev/v1vibe.git
+
+# Run setup
+v1vibe setup
+```
+
+### Option 2: Install from source
 
 ```bash
 # Clone the repository
@@ -115,22 +131,6 @@ pipx install .
 
 # Or install with pip
 pip install .
-
-# Run setup
-v1vibe setup
-```
-
-### Option 2: Install directly from GitHub
-
-```bash
-# With uv (recommended)
-uv tool install git+https://github.com/arcaniusdev/v1vibe.git
-
-# Or with pipx
-pipx install git+https://github.com/arcaniusdev/v1vibe.git
-
-# Or with pip
-pip install git+https://github.com/arcaniusdev/v1vibe.git
 
 # Run setup
 v1vibe setup
@@ -222,7 +222,8 @@ v1vibe test
 
 **Supported regions:** `us-east-1`, `eu-central-1`, `ap-southeast-1`, `ap-northeast-1`, `ap-southeast-2`, `ap-south-1`, `me-south-1`, `eu-west-2`, `ca-central-1`
 
-**Uninstalling:**
+## Uninstalling
+
 ```bash
 v1vibe uninstall  # Removes config, TMAS binary, MCP registration, CLAUDE.md instructions
 uv tool uninstall v1vibe  # Then remove the Python package
