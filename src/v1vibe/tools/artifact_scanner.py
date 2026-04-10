@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Set
 
 from v1vibe.clients import AppContext
 
@@ -35,6 +36,80 @@ FORBIDDEN_PATHS = [
     "/usr/bin", "/usr/sbin",
     "/System",  # macOS system directory
 ]
+
+# Directories to exclude from scanning (symlinks, dependencies, build artifacts)
+# These cause issues with Docker mounting and symlink resolution
+EXCLUDED_DIRS = [
+    ".venv",           # Python virtual environments (symlinks to system Python)
+    "venv",            # Alternative Python venv name
+    "node_modules",    # Node.js dependencies
+    ".git",            # Git repository data
+    "__pycache__",     # Python bytecode cache
+    ".pytest_cache",   # Pytest cache
+    "dist",            # Build distributions
+    "build",           # Build artifacts
+    ".tox",            # Tox testing environments
+    ".mypy_cache",     # MyPy type checker cache
+    ".ruff_cache",     # Ruff linter cache
+]
+
+
+def _create_filtered_copy(source_dir: str, dest_dir: str, excluded_dirs: Set[str]) -> None:
+    """Create a filtered copy of source_dir excluding specified directories and symlinks.
+
+    This avoids symlink issues by excluding directories like .venv that contain
+    symlinks pointing outside the project (e.g., to /opt/homebrew).
+
+    Args:
+        source_dir: Source directory to copy from
+        dest_dir: Destination directory to copy to
+        excluded_dirs: Set of directory names to exclude (e.g., {'.venv', 'node_modules'})
+    """
+    source_path = Path(source_dir)
+    dest_path = Path(dest_dir)
+
+    def should_exclude(path: Path) -> bool:
+        """Check if path or any of its parents should be excluded."""
+        try:
+            relative = path.relative_to(source_path)
+            # Check if any part of the path is in excluded_dirs
+            return any(part in excluded_dirs for part in relative.parts)
+        except ValueError:
+            return True
+
+    # Walk the directory tree manually for better control
+    for root, dirs, files in os.walk(source_dir, followlinks=False):
+        root_path = Path(root)
+
+        # Filter out excluded directories from traversal
+        dirs[:] = [d for d in dirs if not should_exclude(root_path / d)]
+
+        # Skip if current directory is excluded
+        if should_exclude(root_path):
+            continue
+
+        # Create corresponding directory in dest
+        try:
+            relative_root = root_path.relative_to(source_path)
+            dest_root = dest_path / relative_root
+            dest_root.mkdir(parents=True, exist_ok=True)
+
+            # Copy files (skip symlinks)
+            for file in files:
+                src_file = root_path / file
+                # Skip symlinks entirely
+                if src_file.is_symlink():
+                    continue
+
+                dest_file = dest_root / file
+                try:
+                    shutil.copy2(src_file, dest_file)
+                except (OSError, PermissionError):
+                    # Skip files we can't read/copy
+                    pass
+        except (OSError, PermissionError, ValueError):
+            # Skip directories we can't process
+            pass
 
 
 def _validate_artifact_path(artifact: str) -> str:
@@ -92,6 +167,20 @@ async def scan_artifact(
     - Container images: "registry:myrepo/image:tag", "docker:image:tag", "podman:image:tag"
     - OCI directories: "oci-dir:/path/to/oci"
     - Archives: "docker-archive:image.tar", "oci-archive:image.tar"
+
+    Exclusions (automatic on macOS Docker mode):
+    - Virtual environments (.venv, venv), node_modules, .git, and build artifacts are
+      automatically excluded when scanning directories to avoid symlink issues (e.g.,
+      .venv/bin/python -> /opt/homebrew) and reduce scan time. Container images are
+      scanned in full.
+
+    Known Limitations:
+    - **Malware scanning:** Only works on container images, not directories. Use scan_file
+      for file-by-file malware scanning.
+    - **Secret scanning with .venv:** TMAS secret scanner aggressively follows symlinks and may
+      fail on project roots containing .venv. Workarounds: (1) scan source directory only
+      (e.g., 'src/'), (2) run vulnerability scan separately, or (3) use grep for manual
+      secret detection.
 
     Args:
         artifact: Path to artifact to scan (directory, image reference, or archive).
@@ -198,8 +287,14 @@ async def scan_artifact(
             # Configure volume mounts based on artifact type
             # Each type needs different access (filesystem, Docker socket, etc.)
             if is_directory:
-                # Mount directory for scanning
-                cmd.extend(["-v", f"{artifact_abs}:/scan:ro"])
+                # Create filtered copy to avoid symlink issues
+                # This prevents errors from symlinks pointing outside the project (e.g., .venv -> /opt/homebrew)
+                filtered_dir = Path(tmpdir) / "filtered_scan"
+                filtered_dir.mkdir()
+                _create_filtered_copy(artifact_abs, str(filtered_dir), set(EXCLUDED_DIRS))
+
+                # Mount filtered directory for scanning
+                cmd.extend(["-v", f"{filtered_dir}:/scan:ro"])
                 scan_target = "dir:/scan"
             elif artifact_validated.startswith("docker:"):
                 # Mount Docker socket for docker: images (needs access to Docker daemon)
@@ -336,16 +431,41 @@ async def scan_artifact(
 
                 return response
             else:
-                # No output file - return stderr/stdout
-                return {
+                # No output file - analyze error and provide helpful guidance
+                stderr = result.stderr.strip()
+
+                # Check for specific known issues
+                error_message = "TMAS scan did not produce output file"
+                suggestions = []
+
+                if "InvalidMalwareScanArtifactTypeError" in stderr or "not supported by malware scanning" in stderr:
+                    error_message = "Malware scanning is not supported for directory artifacts"
+                    suggestions.append("Use scan_file tool to scan individual files for malware")
+                    suggestions.append("Malware scanning via scan_artifact only works for container images")
+
+                if "unable to follow symlink" in stderr or "no such file or directory" in stderr:
+                    # Secret scanning is particularly aggressive about following symlinks
+                    # Even with filtering, it can encounter issues on project roots
+                    error_message = "TMAS secret scan encountered broken symlinks (known limitation with .venv)"
+                    suggestions.append("Workaround 1: Scan source code directory only (e.g., 'src/', 'app/', 'lib/')")
+                    suggestions.append("Workaround 2: Run vulnerability and secret scans separately - vulnerability scanning works on full projects")
+                    suggestions.append("Workaround 3: Temporarily move/rename .venv before scanning")
+                    suggestions.append("Note: scan_file tool can scan individual files without symlink issues")
+
+                error_response = {
                     "error": {
                         "code": "ScanFailed",
-                        "message": "TMAS scan did not produce output file",
+                        "message": error_message,
                         "exitCode": result.returncode,
                         "stdout": result.stdout.strip(),
-                        "stderr": result.stderr.strip(),
+                        "stderr": stderr,
                     }
                 }
+
+                if suggestions:
+                    error_response["error"]["suggestions"] = suggestions
+
+                return error_response
 
         except subprocess.TimeoutExpired:
             return {

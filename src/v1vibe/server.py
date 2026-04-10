@@ -506,6 +506,20 @@ async def scan_artifact(
     - OCI directories: "oci-dir:/path/to/oci"
     - Archives: "docker-archive:image.tar", "oci-archive:image.tar"
 
+    Exclusions (automatic on macOS Docker mode):
+    - Virtual environments (.venv, venv), node_modules, .git, and build artifacts are
+      automatically excluded when scanning directories to avoid symlink issues (e.g.,
+      .venv/bin/python -> /opt/homebrew) and reduce scan time. Container images are
+      scanned in full.
+
+    Known Limitations:
+    - **Malware scanning:** Only works on container images, not directories. Use scan_file
+      for file-by-file malware scanning.
+    - **Secret scanning with .venv:** TMAS secret scanner aggressively follows symlinks and may
+      fail on project roots containing .venv. Workarounds: (1) scan source directory only
+      (e.g., 'src/'), (2) run vulnerability scan separately, or (3) use grep for manual
+      secret detection.
+
     Args:
         artifact: Path to artifact (directory, image reference, or archive).
         scan_types: Scan types to run. Options: "vulnerability", "malware", "secrets".
@@ -823,7 +837,7 @@ def check_urls(project_path: str = ".", urls: list[str] | None = None) -> str:
 
 ## What this does
 Validates URLs against:
-- **Global threat intelligence** (71K+ cached IOCs with hourly updates)
+- **Global threat intelligence** (266K+ cached IOCs with hourly updates)
 - **Tenant blocklist** (your organization's custom suspicious objects)
 - **Behavioral sandbox** (for suspicious/unknown domains - optional, recommended)
 
@@ -962,7 +976,7 @@ def search_threats(
 
     **TOOLS USED:** search_threat_indicators, check_suspicious_objects
 
-    Searches global threat feed (71K+ IOCs, cached) and tenant blocklist for:
+    Searches global threat feed (266K+ IOCs, cached) and tenant blocklist for:
     domains, URLs, IPs, file hashes, email addresses, registry keys, mutexes.
     """
     indicators_hint = (
@@ -974,7 +988,7 @@ def search_threats(
 
 ## What this does
 Searches TWO sources:
-1. **Global threat intelligence feed** - 71K+ IOCs cached locally, hourly updates
+1. **Global threat intelligence feed** - 266K+ IOCs cached locally, hourly updates
 2. **Tenant blocklist** - Your organization's custom suspicious objects
 
 Supported IOC types (auto-detected):
@@ -1020,7 +1034,7 @@ Collect all unique IOCs."""}
 ## Step 2: Search global threat feed
 For EACH unique IOC:
 → Use `search_threat_indicators` with the IOC value.
-  - Instant lookup (cached, ~71K indicators from 365 days)
+  - Instant lookup (cached, ~266K indicators from 2018-present)
   - Auto-detects IOC type (no need to specify)
   - Returns match details: indicator type, threat type, valid dates, labels
   - Cache info: total indicators, last updated

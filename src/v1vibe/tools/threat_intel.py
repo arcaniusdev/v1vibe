@@ -2,9 +2,9 @@
 
 Provides two complementary threat intelligence capabilities:
 1. check_suspicious_objects: Query tenant's custom blocklist for known bad indicators
-2. search_threat_indicators: Search global threat feed (~71K IOCs) with local cache
+2. search_threat_indicators: Search global threat feed (~266K IOCs) with local cache
 
-The threat feed cache is persisted to disk (~29MB) and refreshed hourly with
+The threat feed cache is persisted to disk (~95MB) and refreshed hourly with
 delta updates, providing instant lookups without API calls.
 """
 
@@ -122,7 +122,7 @@ async def _fetch_threat_feed(
     Args:
         ctx: Application context
         start_date: If provided, only fetch indicators newer than this date (delta update)
-                   If None, fetch all indicators from last 365 days (full refresh)
+                   If None, fetch all available historical indicators (full refresh)
 
     Returns:
         List of indicator objects from STIX bundle
@@ -130,8 +130,9 @@ async def _fetch_threat_feed(
     end_time = datetime.now(timezone.utc)
 
     if start_date is None:
-        # Full fetch: get everything from last year
-        start_time = end_time - timedelta(days=365)
+        # Full fetch: get all available historical data from Vision One inception
+        # Tested range: Data available from March 2018 to present (~266K indicators)
+        start_time = datetime(2018, 1, 1, tzinfo=timezone.utc)
     else:
         # Delta fetch: get only new indicators
         start_time = start_date
@@ -189,7 +190,7 @@ async def _ensure_feed_cache(ctx: AppContext) -> ThreatFeedCache:
     The cache is stored in AppContext for the session and persisted to disk.
     """
     # Session cache: load once per AppContext lifespan, reuse for all searches
-    # This avoids re-reading the ~29MB JSON file on every search
+    # This avoids re-reading the ~95MB JSON file on every search
     if not hasattr(ctx, "_threat_feed_cache"):
         ctx._threat_feed_cache = _load_cache_from_disk()
 
@@ -202,7 +203,7 @@ async def _ensure_feed_cache(ctx: AppContext) -> ThreatFeedCache:
     # Cache is stale - refresh it
     if cache.last_updated_at and cache.indicators:
         # Delta update: fetch only NEW indicators since last refresh
-        # This is much faster than re-downloading all 71K indicators
+        # This is much faster than re-downloading all 266K indicators
         new_indicators = await _fetch_threat_feed(ctx, cache.last_updated_at)
 
         if new_indicators:
@@ -319,19 +320,18 @@ async def search_threat_indicators(
     """
     Search TrendAI threat intelligence feed for a specific indicator of compromise (IOC).
 
-    Searches the complete threat intelligence feed (71K+ indicators from last 365 days)
-    for matches. The feed is cached locally (~29MB) and refreshed hourly with delta updates.
+    Searches the complete threat intelligence feed (266K+ indicators from 2018-present)
+    for matches. The feed is cached locally (~95MB) and refreshed hourly with delta updates.
 
     This provides instant lookups against global threat intelligence from TrendAI,
     complementing check_suspicious_objects (tenant blocklist) and sandbox_submit_url.
 
-    **Indicator types automatically detected** (71K+ total indicators):
-    - **File hashes** (27K): SHA256, SHA1, MD5 hashes of malware/trojans
-    - **Domains** (12K): Malicious domain names (C2, phishing, malware distribution)
-    - **IPs** (10K): IPv4/IPv6 addresses associated with threats
-    - **URLs** (7K): Full URLs with paths (phishing, malware downloads, C2)
-    - **Network traffic** (15K): Domain/IP references in network patterns
-    - **Email addresses** (150+): Malicious sender addresses, phishing emails
+    **Indicator types automatically detected** (266K+ total indicators):
+    - **File hashes** (123K): SHA256, SHA1, MD5 hashes of malware/trojans
+    - **IP addresses** (91K): IPv4/IPv6 addresses associated with threats
+    - **Domains** (39K): Malicious domain names (C2, phishing, malware distribution)
+    - **URLs** (11K): Full URLs with paths (phishing, malware downloads, C2)
+    - **Email addresses** (350+): Malicious sender addresses, phishing emails
     - **Windows registry keys** (50+): Malware persistence indicators
     - **Mutexes** (9): Malware synchronization objects
     - **File paths** (8): Known malware installation paths

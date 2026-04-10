@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Enhanced Error Messages**: Artifact scanner now provides actionable suggestions when scans fail
+  - Malware scanning errors now explain the container-only limitation and suggest using `scan_file`
+  - Symlink errors provide 4 specific workarounds (scan subdirectories, split scan types, move .venv, use scan_file)
+  - Error responses include `suggestions` array with concrete next steps
+
+### Changed
+- **Threat Intelligence Feed**: Expanded from 1-year (71K indicators) to full historical data from 2018-present (266K indicators, ~8.1 years)
+  - Cache size increased from ~29MB to ~95MB
+  - First fetch time increased from ~20s to ~60s (one-time cost)
+  - Subsequent lookups remain instant (<0.1s)
+  - Hourly delta updates remain fast (<5s)
+  - 274% more threat intelligence coverage (file hashes: +356%, IPs: +814%, domains: +228%, URLs: +64%)
+  - Provides historical threat detection for long-running APT campaigns and infrastructure reuse
+
+- **Artifact Scanner Improvements**:
+  - Automatic exclusion of problematic directories in Docker mode (.venv, venv, node_modules, .git, __pycache__, etc.)
+  - Filtered directory copying to avoid symlink issues (e.g., .venv/bin/python -> /opt/homebrew)
+  - All symlinks now skipped during directory scanning to prevent broken link errors
+  - Better handling of TMAS secret scanner symlink sensitivity
+
+### Fixed
+- **Symlink Error Handling**: Improved handling of broken symlinks in virtual environments
+  - Docker mode now creates filtered copy of source directory excluding .venv and other dependency/build directories
+  - Prevents "unable to follow symlink: lstat /opt/homebrew: no such file or directory" errors in most cases
+  - Note: TMAS secret scanner remains aggressive with symlinks; workaround is to scan subdirectories (e.g., `src/`)
+
+### Documentation
+- Added "Known Limitations" section to `scan_artifact` docstring explaining:
+  - Malware scanning container-only restriction
+  - Secret scanning symlink sensitivity with .venv on macOS
+  - Recommended workarounds for each limitation
+- Updated MCP server tool descriptions to reflect automatic exclusions and limitations
+
 ## [0.1.0] - 2026-04-10
 
 ### Added
