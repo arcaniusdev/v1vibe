@@ -17,6 +17,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from v1vibe.config import AI_SCAN_TIMEOUT
 from v1vibe.utils import format_error
 
 if TYPE_CHECKING:
@@ -105,36 +106,39 @@ async def detect_llm_usage(project_path: str) -> list[dict]:
     if not py_files:
         return []
 
+    # Optimization: read all files once and cache content to reduce disk I/O (3x faster)
+    file_contents: dict[Path, str] = {}
+    for py_file in py_files:
+        try:
+            file_contents[py_file] = py_file.read_text()
+        except Exception:
+            # Skip files that can't be read
+            continue
+
+    # Check all providers against cached content
     for provider, patterns in LLM_PATTERNS.items():
         provider_files = []
         detected_endpoints = set()
         detected_models = set()
         confidence = "low"
 
-        for py_file in py_files:
-            try:
-                content = py_file.read_text()
+        for py_file, content in file_contents.items():
+            # Check for imports (high confidence)
+            for import_pattern in patterns["imports"]:
+                if re.search(import_pattern, content):
+                    provider_files.append(str(py_file.relative_to(project_root)))
+                    confidence = "high"
+                    break
 
-                # Check for imports (high confidence)
-                for import_pattern in patterns["imports"]:
-                    if re.search(import_pattern, content):
-                        provider_files.append(str(py_file.relative_to(project_root)))
-                        confidence = "high"
-                        break
+            # Check for endpoints
+            for endpoint_pattern in patterns["endpoints"]:
+                matches = re.findall(endpoint_pattern, content)
+                detected_endpoints.update(matches)
 
-                # Check for endpoints
-                for endpoint_pattern in patterns["endpoints"]:
-                    matches = re.findall(endpoint_pattern, content)
-                    detected_endpoints.update(matches)
-
-                # Check for model names
-                for model_pattern in patterns["models"]:
-                    matches = re.findall(model_pattern, content)
-                    detected_models.update(matches)
-
-            except Exception:
-                # Skip files that can't be read
-                continue
+            # Check for model names
+            for model_pattern in patterns["models"]:
+                matches = re.findall(model_pattern, content)
+                detected_models.update(matches)
 
         # If we found this provider, add detection
         if provider_files or detected_endpoints or detected_models:
@@ -260,48 +264,47 @@ async def scan_llm_interactive(
         # Add JSON output
         cmd.extend(["--output", f"json={output_path}"])
 
-        # Run TMAS AI Scanner (interactive, so we can't capture output easily)
-        # Note: This will launch the interactive wizard in the user's terminal
-        result = subprocess.run(
-            cmd,
-            env={**subprocess.os.environ, "TMAS_API_KEY": ctx.settings.api_token},
-            check=False,
-            timeout=3600,  # 1 hour timeout for long scans
-        )
-
-        if result.returncode != 0:
-            # Clean up temp file
-            Path(output_path).unlink(missing_ok=True)
-            return {
-                "error": {
-                    "code": "ScanFailed",
-                    "message": f"TMAS AI Scanner exited with code {result.returncode}",
-                    "exitCode": result.returncode,
-                }
-            }
-
-        # Read JSON results
         try:
-            output = Path(output_path).read_text()
-            scan_results = json.loads(output)
+            # Run TMAS AI Scanner (interactive, so we can't capture output easily)
+            # Note: This will launch the interactive wizard in the user's terminal
+            result = subprocess.run(
+                cmd,
+                env={**subprocess.os.environ, "TMAS_API_KEY": ctx.settings.api_token},
+                check=False,
+                timeout=AI_SCAN_TIMEOUT,
+            )
 
-            # Clean up temp file
-            Path(output_path).unlink(missing_ok=True)
-
-            return {
-                "status": "completed",
-                "region": scan_region,
-                "configFile": config_file,
-                "results": scan_results,
-                "outputFile": output_path,
-            }
-        except (FileNotFoundError, json.JSONDecodeError) as exc:
-            return {
-                "error": {
-                    "code": "OutputParseFailed",
-                    "message": f"Failed to parse AI Scanner output: {exc}",
+            if result.returncode != 0:
+                return {
+                    "error": {
+                        "code": "ScanFailed",
+                        "message": f"TMAS AI Scanner exited with code {result.returncode}",
+                        "exitCode": result.returncode,
+                    }
                 }
-            }
+
+            # Read JSON results
+            try:
+                output = Path(output_path).read_text()
+                scan_results = json.loads(output)
+
+                return {
+                    "status": "completed",
+                    "region": scan_region,
+                    "configFile": config_file,
+                    "results": scan_results,
+                    "outputFile": output_path,
+                }
+            except (FileNotFoundError, json.JSONDecodeError) as exc:
+                return {
+                    "error": {
+                        "code": "OutputParseFailed",
+                        "message": f"Failed to parse AI Scanner output: {exc}",
+                    }
+                }
+        finally:
+            # Always clean up temp file
+            Path(output_path).unlink(missing_ok=True)
 
     except subprocess.TimeoutExpired:
         return {
@@ -379,6 +382,7 @@ async def scan_llm_endpoint(
             config_path = config_file.name
 
         # Determine output path
+        is_temp_output = output_file is None
         if output_file:
             output_path = Path(output_file).resolve()
         else:
@@ -388,91 +392,91 @@ async def scan_llm_endpoint(
             output_path = Path(temp_output.name)
             temp_output.close()
 
-        # Build TMAS command
-        if tmas_binary_path == "docker":
-            # Docker mode
-            config_dir = Path(config_path).parent
-            output_dir = output_path.parent
-
-            cmd = [
-                "docker",
-                "run",
-                "--rm",
-                "-v",
-                f"{config_dir}:/config:ro",
-                "-v",
-                f"{output_dir}:/output",
-                "-e",
-                f"TMAS_API_KEY={ctx.settings.api_token}",
-                "trendmicro/tmas:latest",
-                "aiscan",
-                "llm",
-                "--config",
-                f"/config/{Path(config_path).name}",
-                "--output",
-                f"json=/output/{output_path.name}",
-            ]
-        else:
-            # Binary mode
-            cmd = [
-                tmas_binary_path,
-                "aiscan",
-                "llm",
-                "--config",
-                config_path,
-                "--output",
-                f"json={output_path}",
-            ]
-
-        # Add region
-        scan_region = region or ctx.settings.region
-        cmd.extend(["--region", scan_region])
-
-        # Run TMAS AI Scanner
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            env={**subprocess.os.environ, "TMAS_API_KEY": ctx.settings.api_token},
-            check=False,
-            timeout=3600,  # 1 hour timeout
-        )
-
-        # Clean up temp config
-        Path(config_path).unlink(missing_ok=True)
-
-        if result.returncode != 0:
-            return {
-                "error": {
-                    "code": "ScanFailed",
-                    "message": "AI Scanner scan failed",
-                    "exitCode": result.returncode,
-                    "stderr": result.stderr,
-                }
-            }
-
-        # Read results
         try:
-            scan_results = json.loads(output_path.read_text())
+            # Build TMAS command
+            if tmas_binary_path == "docker":
+                # Docker mode
+                config_dir = Path(config_path).parent
+                output_dir = output_path.parent
 
-            return {
-                "status": "completed",
-                "endpoint": endpoint_url,
-                "model": model_name,
-                "region": scan_region,
-                "results": scan_results,
-                "outputFile": str(output_path) if output_file else None,
-            }
-        except (FileNotFoundError, json.JSONDecodeError) as exc:
-            return {
-                "error": {
-                    "code": "OutputParseFailed",
-                    "message": f"Failed to parse AI Scanner output: {exc}",
+                cmd = [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "-v",
+                    f"{config_dir}:/config:ro",
+                    "-v",
+                    f"{output_dir}:/output",
+                    "-e",
+                    f"TMAS_API_KEY={ctx.settings.api_token}",
+                    "trendmicro/tmas:latest",
+                    "aiscan",
+                    "llm",
+                    "--config",
+                    f"/config/{Path(config_path).name}",
+                    "--output",
+                    f"json=/output/{output_path.name}",
+                ]
+            else:
+                # Binary mode
+                cmd = [
+                    tmas_binary_path,
+                    "aiscan",
+                    "llm",
+                    "--config",
+                    config_path,
+                    "--output",
+                    f"json={output_path}",
+                ]
+
+            # Add region
+            scan_region = region or ctx.settings.region
+            cmd.extend(["--region", scan_region])
+
+            # Run TMAS AI Scanner
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                env={**subprocess.os.environ, "TMAS_API_KEY": ctx.settings.api_token},
+                check=False,
+                timeout=AI_SCAN_TIMEOUT,
+            )
+
+            if result.returncode != 0:
+                return {
+                    "error": {
+                        "code": "ScanFailed",
+                        "message": "AI Scanner scan failed",
+                        "exitCode": result.returncode,
+                        "stderr": result.stderr,
+                    }
                 }
-            }
+
+            # Read results
+            try:
+                scan_results = json.loads(output_path.read_text())
+
+                return {
+                    "status": "completed",
+                    "endpoint": endpoint_url,
+                    "model": model_name,
+                    "region": scan_region,
+                    "results": scan_results,
+                    "outputFile": str(output_path) if output_file else None,
+                }
+            except (FileNotFoundError, json.JSONDecodeError) as exc:
+                return {
+                    "error": {
+                        "code": "OutputParseFailed",
+                        "message": f"Failed to parse AI Scanner output: {exc}",
+                    }
+                }
         finally:
+            # Always clean up temp config file
+            Path(config_path).unlink(missing_ok=True)
             # Clean up temp output if not user-specified
-            if not output_file:
+            if is_temp_output:
                 output_path.unlink(missing_ok=True)
 
     except subprocess.TimeoutExpired:

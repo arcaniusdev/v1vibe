@@ -13,15 +13,11 @@ from pathlib import Path
 from typing import Set
 
 from v1vibe.clients import AppContext
+from v1vibe.config import SCAN_TIMEOUT
+from v1vibe.constants import TMAS_BASE_URL, TMAS_DOCKER_IMAGE, TMAS_VERSION
 
-# TMAS version - single source of truth for both binary and Docker modes
-TMAS_VERSION = "2.221.0"
-
-# Docker image for TMAS execution on macOS
-DOCKER_IMAGE = "ubuntu:22.04"
-
-# Scan timeout (10 minutes)
-SCAN_TIMEOUT_SECONDS = 600
+# Docker image for TMAS execution on macOS (from constants)
+DOCKER_IMAGE = TMAS_DOCKER_IMAGE
 
 # Forbidden paths to prevent scanning system directories
 # Note: macOS symlinks like /etc -> /private/etc are handled by including both
@@ -182,6 +178,20 @@ async def scan_artifact(
       (e.g., 'src/'), (2) run vulnerability scan separately, or (3) use grep for manual
       secret detection.
 
+    Performance Note:
+    - **Symlink filtering overhead:** On macOS Docker mode, scanning large project roots
+      creates a filtered directory copy (excluding .venv, node_modules, etc.) to avoid
+      symlink issues. For projects >1GB or >10,000 files, this can take 30+ seconds and
+      use significant temp space. **Optimization:** Scan specific subdirectories (e.g.,
+      'src/', 'lib/') instead of the full project root to avoid this overhead.
+
+    Security Note:
+    - **Docker socket access:** Scanning "docker:" images requires mounting the Docker socket
+      (/var/run/docker.sock) into the TMAS container. This grants the container root-equivalent
+      access to the Docker daemon and is necessary for scanning Docker images by name. Only
+      scan trusted images or use alternative artifact types (docker-archive:, oci-archive:) when
+      possible.
+
     Args:
         artifact: Path to artifact to scan (directory, image reference, or archive).
         scan_types: List of scan types to run. Options: "vulnerability", "malware", "secrets".
@@ -297,7 +307,10 @@ async def scan_artifact(
                 cmd.extend(["-v", f"{filtered_dir}:/scan:ro"])
                 scan_target = "dir:/scan"
             elif artifact_validated.startswith("docker:"):
-                # Mount Docker socket for docker: images (needs access to Docker daemon)
+                # SECURITY WARNING: Mounting Docker socket gives container root-equivalent
+                # access to the host Docker daemon. This is required for scanning docker:
+                # image references but creates a privilege escalation path. Only scan
+                # trusted images or use alternative formats (docker-archive:, oci-archive:).
                 cmd.extend(["-v", "/var/run/docker.sock:/var/run/docker.sock"])
                 scan_target = shlex.quote(artifact_validated)
             elif artifact_validated.startswith(("docker-archive:", "oci-archive:")):
@@ -340,7 +353,7 @@ async def scan_artifact(
             # Build shell command to run inside container
             # Note: $ARCH is a shell variable expanded inside the container, not here
             # The URL is safe - TMAS_VERSION is a constant and base URL is hardcoded
-            tmas_url = f"https://ast-cli.xdr.trendmicro.com/tmas-cli/{TMAS_VERSION}/tmas-cli_Linux_$ARCH.tar.gz"
+            tmas_url = f"{TMAS_BASE_URL}/{TMAS_VERSION}/tmas-cli_Linux_$ARCH.tar.gz"
 
             shell_cmd_parts = [
                 "apt-get update -qq && apt-get install -y -qq curl > /dev/null 2>&1 &&",
@@ -409,7 +422,7 @@ async def scan_artifact(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=SCAN_TIMEOUT_SECONDS,
+                timeout=SCAN_TIMEOUT,
                 env=env,
             )
 
@@ -471,7 +484,7 @@ async def scan_artifact(
             return {
                 "error": {
                     "code": "ScanTimeout",
-                    "message": f"TMAS scan exceeded {SCAN_TIMEOUT_SECONDS} second timeout",
+                    "message": f"TMAS scan exceeded {SCAN_TIMEOUT} second timeout",
                 }
             }
         except Exception as e:

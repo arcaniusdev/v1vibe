@@ -17,10 +17,7 @@ import httpx
 
 import amaas.grpc.aio as amaas_aio
 
-from v1vibe.config import Settings, load_settings
-
-# HTTP client timeout for Vision One API calls (seconds)
-HTTP_TIMEOUT = 60.0
+from v1vibe.config import HTTP_TIMEOUT, Settings, load_settings
 
 
 @dataclass

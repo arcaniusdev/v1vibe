@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from v1vibe import api_endpoints
 from v1vibe.clients import AppContext
 from v1vibe.utils import check_response, format_error
 
@@ -35,7 +36,7 @@ async def evaluate(
     """
     try:
         resp = await ctx.http.post(
-            "/v3.0/aiSecurity/applyGuardrails",
+            api_endpoints.AI_GUARD_EVALUATE,
             headers={
                 "Content-Type": "application/json",
                 "TMV1-Application-Name": application_name,

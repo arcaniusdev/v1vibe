@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from v1vibe import api_endpoints
 from v1vibe.clients import AppContext
 from v1vibe.utils import check_response, format_error, sanitize_filter_value
 
@@ -108,9 +109,16 @@ def _save_cache_to_disk(cache: ThreatFeedCache) -> None:
 
     # Write atomically using temp file + rename
     temp_path = cache_path.with_suffix(".tmp")
-    with open(temp_path, "w") as f:
-        json.dump(data, f)
-    temp_path.replace(cache_path)
+    try:
+        with open(temp_path, "w") as f:
+            json.dump(data, f)
+        # Set restrictive permissions (owner read/write only) before replacing
+        temp_path.chmod(0o600)
+        temp_path.replace(cache_path)
+    except Exception:
+        # Clean up temp file if atomic replace fails
+        temp_path.unlink(missing_ok=True)
+        raise
 
 
 async def _fetch_threat_feed(
@@ -142,7 +150,7 @@ async def _fetch_threat_feed(
 
     all_indicators = []
     url = (
-        f"/v3.0/threatintel/feedIndicators"
+        f"{api_endpoints.THREAT_INTEL_FEED}"
         f"?startDateTime={start_dt}&endDateTime={end_dt}&top={API_PAGE_SIZE}"
     )
 
@@ -484,7 +492,7 @@ async def check_suspicious_objects(
         filter_expr = " and ".join(filter_parts)
 
         resp = await ctx.http.get(
-            "/v3.0/threatintel/suspiciousObjects",
+            api_endpoints.THREAT_INTEL_SUSPICIOUS_OBJECTS,
             headers={"TMV1-Filter": filter_expr},
             params={"top": 50},
         )

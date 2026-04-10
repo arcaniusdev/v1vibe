@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from v1vibe import api_endpoints
 from v1vibe.clients import AppContext
 from v1vibe.utils import check_response, format_error
 
@@ -58,7 +59,7 @@ async def list_compliance_standards(ctx: AppContext) -> dict[str, Any]:
         }
     """
     try:
-        resp = await ctx.http.get("/beta/cloudPosture/complianceStandards")
+        resp = await ctx.http.get(api_endpoints.IAC_GET_COMPLIANCE_STANDARDS)
         return check_response(resp)
     except Exception as exc:
         return format_error(exc)
@@ -107,7 +108,7 @@ async def list_compliance_profiles(ctx: AppContext, limit: int = 100) -> dict[st
                 }
             }
 
-        resp = await ctx.http.get("/beta/cloudPosture/profiles", params={"top": limit})
+        resp = await ctx.http.get(api_endpoints.IAC_GET_PROFILES, params={"top": limit})
         return check_response(resp)
     except Exception as exc:
         return format_error(exc)
@@ -191,7 +192,7 @@ async def scan_template(
             body["profileId"] = profile_id
 
         resp = await ctx.http.post(
-            "/beta/cloudPosture/scanTemplate",
+            api_endpoints.IAC_SCAN_TEMPLATE,
             json=body,
         )
         return check_response(resp)
@@ -228,18 +229,21 @@ async def scan_terraform_archive(
         if not os.path.isfile(file_path):
             return {"error": {"code": "FileNotFound", "message": f"File not found: {file_path}"}}
 
+        # Read file contents first, then close before HTTP upload
         with open(file_path, "rb") as f:
-            data = {"type": "terraform-archive"}
+            file_content = f.read()
 
-            # Add profile_id if specified for targeted compliance scanning
-            if profile_id:
-                data["profileId"] = profile_id
+        data = {"type": "terraform-archive"}
 
-            resp = await ctx.http.post(
-                "/beta/cloudPosture/scanTemplateArchive",
-                files={"file": (os.path.basename(file_path), f, "application/zip")},
-                data=data,
-            )
+        # Add profile_id if specified for targeted compliance scanning
+        if profile_id:
+            data["profileId"] = profile_id
+
+        resp = await ctx.http.post(
+            api_endpoints.IAC_SCAN_ARCHIVE,
+            files={"file": (os.path.basename(file_path), file_content, "application/zip")},
+            data=data,
+        )
         return check_response(resp)
     except Exception as exc:
         return format_error(exc)

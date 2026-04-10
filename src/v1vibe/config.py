@@ -14,8 +14,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-# User configuration directory and file
-CONFIG_DIR = Path.home() / ".v1vibe"
+# User configuration directory and file (can be overridden with V1_CONFIG_DIR)
+CONFIG_DIR = Path(os.getenv("V1_CONFIG_DIR", str(Path.home() / ".v1vibe")))
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 # Mapping of Vision One regions to their API base URLs
@@ -30,6 +30,14 @@ REGION_TO_BASE_URL: dict[str, str] = {
     "eu-west-2": "https://api.uk.xdr.trendmicro.com",
     "ca-central-1": "https://api.ca.xdr.trendmicro.com",
 }
+
+# Configurable timeouts (can be overridden with environment variables)
+# HTTP timeout for Vision One API calls (seconds)
+HTTP_TIMEOUT = float(os.getenv("V1_HTTP_TIMEOUT", "60.0"))
+# TMAS artifact scan timeout (seconds) - 10 minutes default
+SCAN_TIMEOUT = int(os.getenv("V1_SCAN_TIMEOUT", "600"))
+# AI Scanner timeout (seconds) - 1 hour default for comprehensive scans
+AI_SCAN_TIMEOUT = int(os.getenv("V1_AI_SCAN_TIMEOUT", "3600"))
 
 
 @dataclass(frozen=True)

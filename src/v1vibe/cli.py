@@ -76,8 +76,8 @@ When the user asks for any security review, check, or scan, complete EVERY step:
 **Do NOT skip steps because they seem unlikely to find something. Clean results are valid results.**
 """
 
-TMAS_BASE_URL = "https://ast-cli.xdr.trendmicro.com/tmas-cli"
-TMAS_VERSION = "2.221.0"  # TMAS CLI version - update this to upgrade
+from v1vibe.constants import TMAS_BASE_URL, TMAS_VERSION
+
 TMAS_BIN_DIR = CONFIG_DIR / "bin"
 
 
@@ -141,33 +141,34 @@ def _install_tmas() -> str | None:
         _print(f"  Downloading TMAS {version}...")
         urllib.request.urlretrieve(download_url, archive_path)
 
-        # 4. Extract binary
-        binary_name = "tmas.exe" if os_name == "Windows" else "tmas"
-        binary_path = TMAS_BIN_DIR / binary_name
+        try:
+            # 4. Extract binary
+            binary_name = "tmas.exe" if os_name == "Windows" else "tmas"
+            binary_path = TMAS_BIN_DIR / binary_name
 
-        if ext == "tar.gz":
-            with tarfile.open(archive_path, "r:gz") as tar:
-                # Extract just the tmas binary
-                for member in tar.getmembers():
-                    if member.name.endswith(binary_name):
-                        member.name = binary_name  # Flatten path
-                        tar.extract(member, TMAS_BIN_DIR)
-                        break
-        else:  # zip
-            with zipfile.ZipFile(archive_path, "r") as zip_file:
-                for name in zip_file.namelist():
-                    if name.endswith(binary_name):
-                        # Extract and rename to flatten path
-                        data = zip_file.read(name)
-                        binary_path.write_bytes(data)
-                        break
+            if ext == "tar.gz":
+                with tarfile.open(archive_path, "r:gz") as tar:
+                    # Extract just the tmas binary
+                    for member in tar.getmembers():
+                        if member.name.endswith(binary_name):
+                            member.name = binary_name  # Flatten path
+                            tar.extract(member, TMAS_BIN_DIR)
+                            break
+            else:  # zip
+                with zipfile.ZipFile(archive_path, "r") as zip_file:
+                    for name in zip_file.namelist():
+                        if name.endswith(binary_name):
+                            # Extract and rename to flatten path
+                            data = zip_file.read(name)
+                            binary_path.write_bytes(data)
+                            break
 
-        # 5. Make executable (Unix-like)
-        if os_name != "Windows":
-            binary_path.chmod(0o755)
-
-        # 6. Clean up archive
-        archive_path.unlink()
+            # 5. Make executable (Unix-like)
+            if os_name != "Windows":
+                binary_path.chmod(0o755)
+        finally:
+            # Always clean up archive, even if extraction fails
+            archive_path.unlink(missing_ok=True)
 
         return str(binary_path)
 
@@ -222,13 +223,15 @@ def _install_docker_macos() -> bool:
             _print("  You may be prompted for your password.")
             _print()
             try:
-                # Run official Homebrew install script
+                # Download and run official Homebrew install script
+                # (safer than command substitution to avoid shell injection risks)
+                script_url = "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
+                _print(f"  Downloading from {script_url}")
+                script_content = urllib.request.urlopen(script_url).read()
+
                 result = subprocess.run(
-                    [
-                        "/bin/bash",
-                        "-c",
-                        "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)",
-                    ],
+                    ["/bin/bash"],
+                    input=script_content,
                     capture_output=False,  # Show output to user
                 )
 
