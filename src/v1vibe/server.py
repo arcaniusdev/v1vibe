@@ -1,3 +1,16 @@
+"""FastMCP server implementing v1vibe security tools.
+
+Provides 13 security tools and 4 workflow prompts for AI coding assistants:
+- File/URL malware detection and behavioral analysis
+- Dependency vulnerability and secret scanning
+- Infrastructure as Code validation
+- Threat intelligence lookups
+- AI content safety checks
+
+All tools are thin async wrappers that delegate to tool modules in tools/.
+The server includes comprehensive instructions for AI clients via SERVER_INSTRUCTIONS.
+"""
+
 from __future__ import annotations
 
 from mcp.server.fastmcp import Context, FastMCP

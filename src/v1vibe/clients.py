@@ -19,6 +19,9 @@ import amaas.grpc.aio as amaas_aio
 
 from v1vibe.config import Settings, load_settings
 
+# HTTP client timeout for Vision One API calls (seconds)
+HTTP_TIMEOUT = 60.0
+
 
 @dataclass
 class AppContext:
@@ -64,7 +67,7 @@ async def app_lifespan(server: Any) -> AsyncIterator[AppContext]:
         http = httpx.AsyncClient(
             base_url=settings.base_url,
             headers={"Authorization": f"Bearer {settings.api_token}"},
-            timeout=httpx.Timeout(60.0),
+            timeout=httpx.Timeout(HTTP_TIMEOUT),
         )
         yield AppContext(settings=settings, grpc_handle=grpc_handle, http=http)
     finally:

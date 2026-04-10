@@ -1,3 +1,14 @@
+"""Command-line interface for v1vibe.
+
+Provides interactive commands for:
+- setup: Configuration wizard with automated TMAS CLI installation
+- test: Smoke test all Vision One connectivity and capabilities
+- status: Show current configuration and health status
+- uninstall: Remove all configuration, binaries, and MCP registration
+
+The main entry point just starts the MCP server (stdio transport).
+"""
+
 from __future__ import annotations
 
 import asyncio

@@ -1,3 +1,13 @@
+"""Threat intelligence lookups and suspicious object checks.
+
+Provides two complementary threat intelligence capabilities:
+1. check_suspicious_objects: Query tenant's custom blocklist for known bad indicators
+2. search_threat_indicators: Search global threat feed (~71K IOCs) with local cache
+
+The threat feed cache is persisted to disk (~29MB) and refreshed hourly with
+delta updates, providing instant lookups without API calls.
+"""
+
 from __future__ import annotations
 
 import re
@@ -13,6 +23,9 @@ VALID_RISK_LEVELS = {"high", "medium", "low"}
 
 # Threat feed cache TTL (1 hour)
 FEED_CACHE_TTL_SECONDS = 3600
+
+# API pagination limit (Vision One max page size)
+API_PAGE_SIZE = 10000
 
 
 @dataclass
@@ -129,7 +142,7 @@ async def _fetch_threat_feed(
     all_indicators = []
     url = (
         f"/v3.0/threatintel/feedIndicators"
-        f"?startDateTime={start_dt}&endDateTime={end_dt}&top=10000"
+        f"?startDateTime={start_dt}&endDateTime={end_dt}&top={API_PAGE_SIZE}"
     )
 
     # Fetch all pages
