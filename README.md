@@ -23,7 +23,7 @@ AI coding assistants are powerful, but they can't see security threats in:
 - 🔐 **Secret Scanning** — Detect hardcoded credentials, API keys, tokens in code
 - 🐳 **Container Security** — Scan Docker images and registries for vulnerabilities
 - 🧪 **File & URL Sandboxing** — Deep behavioral analysis of files and URLs to detect malicious activity
-- ☁️ **IaC Security** — Scan CloudFormation and Terraform for misconfigurations
+- ☁️ **IaC Security** — Scan CloudFormation and Terraform for misconfigurations and compliance violations
 - 🔎 **Threat Intelligence** — Search global threat indicators (domains, IPs, URLs, file hashes, registry keys, mutexes, email addresses) from TrendAI threat feed. Cached locally with hourly delta updates for instant lookups.
 
 ## How It Works
