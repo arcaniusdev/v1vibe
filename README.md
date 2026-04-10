@@ -1,8 +1,21 @@
 # v1vibe
 
-A comprehensive security validation MCP server powered by [TrendAI Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Provides AI coding assistants with real-time security scanning across **files, dependencies, containers, infrastructure, URLs, and AI content** — all from within your coding workflow.
+**Your AI coding assistant's security advisor.**
 
-**What it does:**
+v1vibe is an MCP server that gives AI assistants (Claude, GitHub Copilot, Cursor, etc.) enterprise-grade security capabilities. Instead of writing code first and running security scans later, your AI can discover, report, and help you fix security issues **during development** — right in your natural conversation.
+
+## Why v1vibe?
+
+AI coding assistants are powerful, but they can't see security threats in:
+- Dependencies with known CVEs
+- Malicious files or URLs in your project  
+- Hardcoded secrets and API keys
+- Infrastructure misconfigurations
+- AI model vulnerabilities (jailbreaks, prompt injection)
+
+**v1vibe solves this.** Powered by [TrendAI Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html), it gives your AI assistant the ability to scan, analyze, and report security findings during development. Catch issues before they reach production, all within your natural coding conversation.
+
+## What it does:
 - 🤖 **AI Safety** — Validate AI prompts and chatbot content for harmful content and prompt injection (runtime guardrails)
 - 🧪 **AI Security Testing** — Auto-detect and test LLMs for vulnerabilities: jailbreaks, prompt injection, data exfiltration (pre-deployment testing)
 - 🦠 **Malware Detection** — Scan files and dependencies for trojans, ransomware, spyware
@@ -30,9 +43,9 @@ No APIs to learn, no commands to memorize. Simply ask your AI assistant (Claude,
 - _"What compliance standards does this violate?"_ (automatic compliance mapping)
 - _"Test my chatbot for security vulnerabilities"_ (auto-detects LLMs and tests for jailbreaks, prompt injection)
 
-Your AI assistant automatically uses v1vibe's security tools to scan files, check dependencies, analyze URLs, search threat intelligence, and generate a comprehensive security report — all in seconds.
+Your AI assistant uses v1vibe to scan files, check dependencies, analyze URLs, search threat intelligence, and generate comprehensive security reports — all in seconds, right in your conversation.
 
-**You don't run v1vibe directly.** It's an MCP server that runs in the background, giving your AI assistant enterprise-grade security capabilities through simple conversation.
+**You don't run v1vibe directly.** It's an MCP server that runs in the background, giving your AI assistant enterprise-grade security scanning capabilities through simple conversation.
 
 ## Features (18 tools)
 

@@ -398,7 +398,9 @@ def cmd_setup() -> None:
     # Step 2: Region
     _print()
     _print("Step 2: Region")
-    regions = sorted(REGION_TO_BASE_URL.keys())
+    # Put us-east-1 first (most common), then sort the rest alphabetically
+    all_regions = sorted(REGION_TO_BASE_URL.keys())
+    regions = ["us-east-1"] + [r for r in all_regions if r != "us-east-1"]
     for i, r in enumerate(regions, 1):
         _print(f"  {i}. {r}")
     _print()
