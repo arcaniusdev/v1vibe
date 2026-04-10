@@ -3,7 +3,6 @@
 A comprehensive security validation MCP server powered by [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Provides AI coding assistants with real-time security scanning across **files, dependencies, containers, infrastructure, URLs, and AI content** — all from within your coding workflow.
 
 **What it does:**
-- 🤖 **AI Safety** — Detect harmful content, PII leakage, and prompt injection
 - 🦠 **Malware Detection** — Scan files and dependencies for trojans, ransomware, spyware
 - 🔍 **Dependency Security** — Find CVEs in 25+ package ecosystems (npm, pip, Maven, Go, Rust, etc.)
 - 🔐 **Secret Scanning** — Detect hardcoded credentials, API keys, tokens in code
@@ -11,13 +10,9 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 - 🌐 **URL Analysis** — Sandbox and analyze URLs for malicious behavior
 - ☁️ **IaC Security** — Scan CloudFormation and Terraform for misconfigurations
 - 🔎 **Threat Intelligence** — Look up IPs, domains, hashes in global threat feeds
+- 🤖 **AI Safety** — Validate AI prompts and chatbot content for harmful content and prompt injection
 
 ## Features (12 tools)
-
-### 🤖 AI Content Safety
-| Tool | What it does |
-|------|-------------|
-| `ai_guard_evaluate` | Detect harmful content, PII leakage, prompt injection, sensitive data exposure |
 
 ### 🦠 Malware & File Security
 | Tool | What it does |
@@ -55,6 +50,11 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 | Tool | What it does |
 |------|-------------|
 | `get_cve_details` | Get detailed CVE information with CVSS scores, mitigation, affected asset counts |
+
+### 🤖 AI Content Safety
+| Tool | What it does |
+|------|-------------|
+| `ai_guard_evaluate` | Evaluate AI prompts, chatbot instructions, and LLM templates for harmful content, PII leakage, and prompt injection attacks |
 
 ### ⚙️ Quota Management
 | Tool | What it does |

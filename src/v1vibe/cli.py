@@ -57,8 +57,8 @@ When the user asks for any security review, check, or scan, complete EVERY step:
 4. **IAC SCAN** -- `scan_iac_template` on every CloudFormation/Terraform file. `scan_terraform_archive` for HCL directories.
 5. **ARTIFACT SCAN** -- `scan_artifact` on project directory (ALWAYS run unless pure docs/config). Scans for dependency CVEs, malware in packages, and exposed secrets.
 6. **CVE DETAILS** -- `get_cve_details` for specific HIGH/CRITICAL CVEs to get mitigation info.
-7. **AI GUARD** -- ALWAYS run `ai_guard_evaluate` with project summary. NOT optional.
-8. **REPORT** -- Results from ALL steps: malware, URLs, threat intel, IaC, artifacts, CVEs, AI Guard. Recommend remediation.
+7. **AI GUARD** (conditional) -- If project contains AI prompts, chatbot instructions, or LLM templates, use `ai_guard_evaluate` to check for harmful content and prompt injection. Skip if no AI content.
+8. **REPORT** -- Results from ALL applicable steps: malware, URLs, threat intel, IaC, artifacts, CVEs, AI Guard (if run). Recommend remediation.
 
 **Both URL and file sandboxing are user-initiated or recommended when suspicious.** Recommend URL sandboxing for unknown/untrusted domains. Recommend file sandboxing when scan results are suspicious.
 

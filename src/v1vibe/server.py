@@ -101,23 +101,25 @@ Cargo.toml, Gemfile, composer.json, etc.) and identify dependencies with known C
 → Report: CVE ID, CVSS score, severity, fix version availability.
 → NOTE: `scan_artifact` provides broader CVE coverage; use this for deep-dive on specific CVEs.
 
-### 7. AI CONTENT VALIDATION — always run this
-Run `ai_guard_evaluate` on EVERY security review. Submit a summary of the project's purpose \
-and key code patterns as the prompt. This checks for harmful content, sensitive information \
-leakage (hardcoded credentials, PII, API keys), and prompt injection patterns in the codebase.
-Also check any AI prompts, prompt templates, or system instructions found in the project.
-→ Run `ai_guard_evaluate` at least once per review — this is not optional.
+### 7. AI CONTENT VALIDATION — conditional (only if AI prompts/templates found)
+**Only run this if the project contains AI-related content:**
+- AI prompt templates or chatbot instructions
+- LLM system prompts or conversation templates
+- AI application code with user-facing prompts
+→ Use `ai_guard_evaluate` to check each prompt/template for harmful content, PII leakage, \
+and prompt injection vulnerabilities.
 → Report: Allow/Block action, harmful content categories, PII detected, prompt injection risk.
+→ **Skip this step** if the project has no AI prompts or chatbot code.
 
 ### 8. REPORT — summarize ALL findings
-After completing ALL steps above, produce a structured report:
+After completing ALL applicable steps above, produce a structured report:
 - Total files scanned and malware detections
 - URLs checked: suspicious object matches and sandbox risk levels
 - Threat intelligence matches for IPs, domains, hashes
 - IaC template misconfigurations
 - Artifact scan results: dependency CVEs, malware in packages, exposed secrets
 - Specific CVE details from get_cve_details
-- AI Guard results (Allow/Block, categories, PII, prompt injection)
+- AI Guard results (only if AI prompts/templates were found and checked)
 - Prioritized remediation recommendations
 
 ## IMPORTANT: Do not skip steps because they seem unlikely to find anything. \
@@ -474,21 +476,25 @@ For any HIGH or CRITICAL CVEs found in step 5, use `get_cve_details` to get:
 - Affected asset counts
 → Report: CVE ID, CVSS score, severity, fix version, remediation steps.
 
-## Step 7: AI GUARD — always run this (not optional)
-Run `ai_guard_evaluate` with a summary of the project's purpose and key code patterns. \
-Also check any AI prompts, templates, or system instructions found in the project.
-→ This detects hardcoded credentials, PII, harmful content, and prompt injection.
+## Step 7: AI GUARD — conditional (only if AI prompts/templates found)
+**Only run this if the project contains AI-related content:**
+- AI prompt templates or chatbot instructions
+- LLM system prompts or conversation templates
+- AI application code with user-facing prompts
+→ Use `ai_guard_evaluate` to check each prompt/template for harmful content, PII leakage, \
+and prompt injection vulnerabilities.
 → Report: Allow/Block, categories flagged, confidence scores.
+→ **Skip this step** if no AI prompts or chatbot code is present.
 
 ## Step 8: FINAL REPORT
-After completing ALL steps, produce a structured report with:
+After completing ALL applicable steps, produce a structured report with:
 - Files scanned and malware detections
 - URLs checked and risk levels
 - Threat intelligence matches
 - IaC misconfigurations
 - Artifact scan results: dependency CVEs, malware in packages, exposed secrets
 - Specific CVE details for critical vulnerabilities
-- AI Guard results
+- AI Guard results (only if AI prompts/templates were found and checked)
 - Prioritized remediation recommendations
 - If any files or URLs look suspicious or have uncertain disposition, suggest \
 sandboxing them for deeper behavioral analysis"""
