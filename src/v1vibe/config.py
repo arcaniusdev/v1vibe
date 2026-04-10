@@ -1,3 +1,12 @@
+"""Configuration management for v1vibe.
+
+Handles loading/saving Vision One API credentials and settings from:
+1. Environment variables (V1_API_TOKEN, V1_REGION) — highest priority
+2. Config file (~/.v1vibe/config.json) — fallback
+
+The config file is created with 0600 permissions to protect the API token.
+"""
+
 from __future__ import annotations
 
 import json
@@ -5,9 +14,11 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+# User configuration directory and file
 CONFIG_DIR = Path.home() / ".v1vibe"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
+# Mapping of Vision One regions to their API base URLs
 REGION_TO_BASE_URL: dict[str, str] = {
     "us-east-1": "https://api.xdr.trendmicro.com",
     "eu-central-1": "https://api.eu.xdr.trendmicro.com",
@@ -23,6 +34,15 @@ REGION_TO_BASE_URL: dict[str, str] = {
 
 @dataclass(frozen=True)
 class Settings:
+    """Immutable configuration settings for v1vibe.
+
+    Attributes:
+        api_token: Vision One API token for authentication
+        region: Vision One region (e.g., "us-east-1", "eu-central-1")
+        base_url: Full API base URL derived from region
+        tmas_binary_path: Path to TMAS CLI binary, or "docker" for Docker mode
+    """
+
     api_token: str
     region: str
     base_url: str
@@ -30,6 +50,11 @@ class Settings:
 
 
 def load_config_file() -> dict:
+    """Load configuration from ~/.v1vibe/config.json.
+
+    Returns:
+        dict: Configuration dict, or empty dict if file doesn't exist or is invalid
+    """
     if not CONFIG_FILE.exists():
         return {}
     try:
@@ -39,6 +64,19 @@ def load_config_file() -> dict:
 
 
 def save_config_file(api_token: str, region: str, tmas_binary_path: str | None = None) -> None:
+    """Save configuration to ~/.v1vibe/config.json with secure permissions.
+
+    The file is created with 0600 permissions (read/write for owner only)
+    to protect the API token.
+
+    Args:
+        api_token: Vision One API token
+        region: Vision One region
+        tmas_binary_path: Optional path to TMAS CLI binary
+
+    Raises:
+        RuntimeError: If config file cannot be written
+    """
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         config = {
@@ -55,6 +93,18 @@ def save_config_file(api_token: str, region: str, tmas_binary_path: str | None =
 
 
 def load_settings() -> Settings:
+    """Load settings from environment variables or config file.
+
+    Priority order:
+    1. Environment variables (V1_API_TOKEN, V1_REGION)
+    2. Config file (~/.v1vibe/config.json)
+
+    Returns:
+        Settings: Validated configuration with API token, region, and base URL
+
+    Raises:
+        RuntimeError: If API token or region is missing, or region is invalid
+    """
     file_config = load_config_file()
 
     # Env vars take priority over config file

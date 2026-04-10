@@ -1,3 +1,12 @@
+"""File and URL sandbox analysis for behavioral threat detection.
+
+Submits files and URLs to TrendAI Vision One sandbox for deep behavioral
+analysis (detonation). Monitors execution, network activity, file system
+changes, and registry modifications to detect malicious behavior.
+
+Supported file types are loaded from sandbox_filetypes.txt (user-editable).
+"""
+
 from __future__ import annotations
 
 import base64
@@ -14,6 +23,11 @@ _FILETYPES_PATH = Path(__file__).resolve().parent.parent / "sandbox_filetypes.tx
 
 
 def _load_sandbox_extensions() -> set[str]:
+    """Load supported file extensions from sandbox_filetypes.txt.
+
+    Returns:
+        set[str]: Set of supported extensions (lowercase, including dot)
+    """
     try:
         lines = _FILETYPES_PATH.read_text().splitlines()
         return {
@@ -41,6 +55,21 @@ async def submit_file(
     archive_password: str | None = None,
     arguments: str | None = None,
 ) -> dict[str, Any]:
+    """Submit a file to sandbox for deep behavioral analysis.
+
+    Validates file extension against supported types before submission.
+    Passwords are base64-encoded for secure transmission.
+
+    Args:
+        ctx: Application context with HTTP client
+        file_path: Absolute path to file to submit
+        document_password: Password for encrypted documents (plaintext, will be encoded)
+        archive_password: Password for encrypted archives (plaintext, will be encoded)
+        arguments: Command-line arguments for PE/script execution in sandbox
+
+    Returns:
+        dict: Task submission result with taskId and quotaRemaining, or error dict
+    """
     try:
         if not os.path.isfile(file_path):
             return {"error": {"code": "FileNotFound", "message": f"File not found: {file_path}"}}
@@ -83,6 +112,16 @@ async def submit_url(
     ctx: AppContext,
     urls: list[str],
 ) -> dict[str, Any]:
+    """Submit up to 10 URLs for sandbox analysis.
+
+    Args:
+        ctx: Application context with HTTP client
+        urls: List of URLs to analyze (1-10 URLs)
+
+    Returns:
+        dict: Batch submission result with items (per-URL task IDs) and quotaRemaining,
+              or error dict if validation fails
+    """
     try:
         if not urls:
             return {"error": {"code": "InvalidInput", "message": "At least one URL is required"}}
@@ -106,6 +145,16 @@ async def get_status(
     ctx: AppContext,
     task_id: str,
 ) -> dict[str, Any]:
+    """Check status of a sandbox submission.
+
+    Args:
+        ctx: Application context with HTTP client
+        task_id: Task ID from submit_file or submit_url
+
+    Returns:
+        dict: Task status with action (running/succeeded/failed) and resourceLocation
+              (when succeeded), or error dict
+    """
     try:
         resp = await ctx.http.get(f"/v3.0/sandbox/tasks/{task_id}")
         return check_response(resp)
@@ -118,6 +167,21 @@ async def get_report(
     result_id: str,
     save_pdf_to: str | None = None,
 ) -> dict[str, Any]:
+    """Retrieve full sandbox analysis report.
+
+    Fetches JSON report, suspicious objects list, and optionally downloads
+    PDF report for human review.
+
+    Args:
+        ctx: Application context with HTTP client
+        result_id: Result ID from resourceLocation in get_status response
+        save_pdf_to: Optional absolute path to save PDF report
+
+    Returns:
+        dict: Analysis report with riskLevel, detectionNames, threatTypes,
+              suspiciousObjects list, and PDF save confirmation (if requested),
+              or error dict
+    """
     try:
         resp = await ctx.http.get(f"/v3.0/sandbox/analysisResults/{result_id}")
         result = check_response(resp)
@@ -157,6 +221,15 @@ async def get_report(
 async def get_submission_quota(
     ctx: AppContext,
 ) -> dict[str, Any]:
+    """Check remaining daily sandbox submission quota.
+
+    Args:
+        ctx: Application context with HTTP client
+
+    Returns:
+        dict: Quota information with daily reserve count, remaining submissions,
+              and breakdown of file vs URL submission counts, or error dict
+    """
     try:
         resp = await ctx.http.get("/v3.0/sandbox/submissionUsage")
         return check_response(resp)
