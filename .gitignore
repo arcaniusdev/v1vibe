@@ -24,5 +24,6 @@ docs/
 
 # Test coverage
 .coverage
+coverage.json
 htmlcov/
 .pytest_cache/
