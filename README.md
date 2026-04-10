@@ -176,6 +176,13 @@ v1vibe stores configuration and binaries in `~/.v1vibe/`:
 1. **Environment variables**: `V1_API_TOKEN` and `V1_REGION`
 2. **Config file**: `~/.v1vibe/config.json` (created by `v1vibe setup`)
 
+**Using environment variables** (useful for CI/CD or if you prefer not to use the setup wizard):
+```bash
+export V1_API_TOKEN="your-api-token"
+export V1_REGION="us-east-1"
+v1vibe test
+```
+
 **Supported regions:** `us-east-1`, `eu-central-1`, `ap-southeast-1`, `ap-northeast-1`, `ap-southeast-2`, `ap-south-1`, `me-south-1`, `eu-west-2`, `ca-central-1`
 
 **Uninstalling:**
