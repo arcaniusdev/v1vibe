@@ -12,6 +12,24 @@ A comprehensive security validation MCP server powered by [TrendAI Vision One](h
 - ☁️ **IaC Security** — Scan CloudFormation and Terraform for misconfigurations
 - 🔎 **Threat Intelligence** — Search global threat indicators (domains, IPs, URLs, file hashes, registry keys, mutexes, email addresses) from TrendAI threat feed. Cached locally with hourly delta updates for instant lookups.
 
+## How It Works
+
+**Just talk to your AI coding assistant. That's it.**
+
+No APIs to learn, no commands to memorize. Simply ask your AI assistant (Claude, GitHub Copilot, Cursor, etc.) to check your code's security:
+
+- _"Check the security of this project"_
+- _"Is this file safe?"_
+- _"Sandbox this file / URL"_
+- _"Scan my dependencies for vulnerabilities"_
+- _"Does this URL look suspicious?"_
+- _"Find any secrets in my code"_
+- _"Review this CloudFormation template for security issues"_
+
+Your AI assistant automatically uses v1vibe's security tools to scan files, check dependencies, analyze URLs, search threat intelligence, and generate a comprehensive security report — all in seconds.
+
+**You don't run v1vibe directly.** It's an MCP server that runs in the background, giving your AI assistant enterprise-grade security capabilities through simple conversation.
+
 ## Features (13 tools)
 
 ### 🤖 AI Content Safety
