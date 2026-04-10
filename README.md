@@ -15,39 +15,118 @@ AI coding assistants are powerful, but they can't see security threats in:
 
 **v1vibe solves this.** Powered by [TrendAI Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html), it gives your AI assistant the ability to scan, analyze, and report security findings during development. Catch issues before they reach production, all within your natural coding conversation.
 
-## What it does:
-- 🤖 **AI Safety** — Validate AI prompts and chatbot content for harmful content and prompt injection (runtime guardrails)
-- 🧪 **AI Security Testing** — Auto-detect and test LLMs for vulnerabilities: jailbreaks, prompt injection, data exfiltration (pre-deployment testing)
-- 🦠 **Malware Detection** — Scan files and dependencies for trojans, ransomware, spyware
-- 🔍 **Dependency Security** — Find CVEs in 25+ package ecosystems (npm, pip, Maven, Go, Rust, etc.)
-- 🔐 **Secret Scanning** — Detect hardcoded credentials, API keys, tokens in code
-- 🐳 **Container Security** — Scan Docker images and registries for vulnerabilities
-- 🧪 **File & URL Sandboxing** — Deep behavioral analysis of files and URLs to detect malicious activity
-- ☁️ **IaC Security** — Scan CloudFormation and Terraform for misconfigurations and compliance violations
-- 🔎 **Threat Intelligence** — Search global threat indicators (domains, IPs, URLs, file hashes, registry keys, mutexes, email addresses) from TrendAI threat feed. Cached locally with hourly delta updates for instant lookups.
+## Quick Start
 
-## How It Works
+### Installation
+
+```bash
+# With uv (recommended)
+uv tool install git+https://github.com/arcaniusdev/v1vibe.git
+
+# Or with pipx
+pipx install git+https://github.com/arcaniusdev/v1vibe.git
+
+# Or with pip
+pip install git+https://github.com/arcaniusdev/v1vibe.git
+```
+
+### Setup
+
+```bash
+v1vibe setup    # Interactive wizard - sets up everything
+v1vibe test     # Verify connectivity
+v1vibe status   # Show configuration
+```
+
+The setup wizard will:
+1. Prompt for your Vision One API token and region
+2. Test connectivity
+3. Install TMAS CLI (TrendAI Artifact Scanner) for dependency/secret/container scanning
+4. Register as an MCP server with Claude Code (if installed)
+5. Configure your AI assistant to use v1vibe automatically
+
+<details>
+<summary><b>📋 Installation from source</b></summary>
+
+```bash
+git clone https://github.com/arcaniusdev/v1vibe.git
+cd v1vibe
+
+# Install with uv (recommended)
+uv tool install .
+
+# Or with pipx
+pipx install .
+
+# Or with pip
+pip install .
+
+# Run setup
+v1vibe setup
+```
+</details>
+
+## Prerequisites
+
+**System requirements:**
+- Python 3.10 or higher
+- One of: `pip`, `uv`, or `pipx` (for installation)
+- Internet connection (for downloading TMAS CLI during setup)
+- **macOS users:** Docker Desktop (for artifact scanning) — setup wizard can install automatically
+
+**Vision One account:**
+- A [TrendAI Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html) account
+- An API key with appropriate permissions ([see required permissions](#getting-your-api-key))
+
+<details>
+<summary><b>🔑 Getting your API key</b></summary>
+
+1. Log in to [TrendAI Vision One](https://portal.xdr.trendmicro.com)
+2. Navigate to **Administration > API Keys**
+3. Click **Add API Key**
+4. Assign a role with these permissions:
+   - **File Security** — Run file scan via SDK
+   - **Sandbox Analysis** — Submit object, View/filter/search
+   - **Threat Intelligence** — View, Suspicious Object Management (View)
+   - **AI Application Security** — AI Guard (Call detection API), AI Scanner
+   - **Container Security** — Run artifacts scan
+   - **Cloud Posture** — Scan templates (for IaC scanning)
+   - **Vulnerability Management** — Read CVEs
+</details>
+
+## How to Use
 
 **Just talk to your AI coding assistant. That's it.**
 
-No APIs to learn, no commands to memorize. Simply ask your AI assistant (Claude, GitHub Copilot, Cursor, etc.) to check your code's security:
+No APIs to learn, no commands to memorize. Simply ask your AI assistant to check your code's security:
 
 - _"Check the security of this project"_
 - _"Is this file safe?"_
-- _"Sandbox this file / URL"_
 - _"Scan my dependencies for vulnerabilities"_
-- _"Does this URL look suspicious?"_
 - _"Find any secrets in my code"_
 - _"Review this CloudFormation template for security issues"_
-- _"Scan this template against CIS benchmarks"_ (compliance-specific scanning)
-- _"What compliance standards does this violate?"_ (automatic compliance mapping)
-- _"Test my chatbot for security vulnerabilities"_ (auto-detects LLMs and tests for jailbreaks, prompt injection)
+- _"Test my chatbot for security vulnerabilities"_
 
 Your AI assistant uses v1vibe to scan files, check dependencies, analyze URLs, search threat intelligence, and generate comprehensive security reports — all in seconds, right in your conversation.
 
 **You don't run v1vibe directly.** It's an MCP server that runs in the background, giving your AI assistant enterprise-grade security scanning capabilities through simple conversation.
 
-## Features (18 tools)
+## Key Features
+
+v1vibe provides **18 security tools** across these categories:
+
+- 🤖 **AI Safety** — Validate AI prompts and chatbot content for harmful content and prompt injection
+- 🧪 **AI Security Testing** — Auto-detect and test LLMs for jailbreaks, prompt injection, data exfiltration
+- 🦠 **Malware Detection** — Scan files and deep behavioral analysis (sandbox) of suspicious files/URLs
+- 🔍 **Dependency Security** — Find CVEs in 25+ package ecosystems (npm, pip, Maven, Go, Rust, etc.)
+- 🔐 **Secret Scanning** — Detect hardcoded credentials, API keys, tokens in code
+- 🐳 **Container Security** — Scan Docker images and registries for vulnerabilities
+- ☁️ **IaC Security** — Scan CloudFormation and Terraform with automatic compliance mapping (45 standards)
+- 🔎 **Threat Intelligence** — Search 266K+ global threat indicators (domains, IPs, file hashes, etc.)
+- 🛡️ **CVE Intelligence** — Detailed vulnerability information with mitigation guidance
+
+<details>
+<summary><b>📚 View all 18 tools</b></summary>
 
 ### 🤖 AI Content Safety (Runtime Guardrails)
 | Tool | What it does |
@@ -57,29 +136,31 @@ Your AI assistant uses v1vibe to scan files, check dependencies, analyze URLs, s
 ### 🧪 AI Security Testing (Pre-Deployment Vulnerability Testing)
 | Tool | What it does |
 |------|-------------|
-| `detect_llm_usage` | **Auto-detect LLM usage** in projects (OpenAI, Anthropic, Google, custom endpoints). Scans code for LLM imports, extracts endpoints, models, API keys. Use before `scan_llm_endpoint` for fully automated testing. |
-| `scan_llm_endpoint` | **PRIMARY automated LLM testing tool.** Tests endpoints for jailbreaks, prompt injection, data exfiltration, toxic content, model manipulation. Fully automated - no user interaction required. Use for security reviews and CI/CD. |
+| `detect_llm_usage` | Auto-detect LLM usage in projects (OpenAI, Anthropic, Google, custom endpoints). Scans code for LLM imports, extracts endpoints, models, API keys. |
+| `scan_llm_endpoint` | **PRIMARY automated LLM testing tool.** Tests endpoints for jailbreaks, prompt injection, data exfiltration, toxic content, model manipulation. Fully automated - no user interaction required. |
 | `scan_llm_interactive` | Manual wizard for LLM testing (ONLY when user explicitly requests interactive mode). Requires terminal interaction. |
 
 ### 🦠 Malware & File Security
 | Tool | What it does |
 |------|-------------|
-| `scan_file` | Fast malware scan using File Security SDK (seconds per file) |
+| `scan_file` | Fast malware scan using File Security SDK (seconds per file, any file type) |
 | `sandbox_submit_file` | Deep behavioral analysis of files (executables, scripts, documents) |
-| `sandbox_submit_url` | Sandbox analysis for up to 10 URLs (user-initiated or recommended for suspicious URLs) |
+| `sandbox_submit_url` | Sandbox analysis for up to 10 URLs |
 | `sandbox_get_status` | Poll sandbox submission status |
 | `sandbox_get_report` | Get full detonation report with risk level, detections, behavioral findings, PDF |
 
-### 🔍 Dependency, Container & Secret Scanning (NEW)
+### 🔍 Dependency, Container & Secret Scanning
 | Tool | What it does |
 |------|-------------|
-| `scan_artifact` | **Comprehensive artifact security:** scans directories, container images, or SBOM files using TMAS CLI. Three scan types available: **vulnerability** (dependency CVEs), **malware** (supply chain attacks in packages), and **secrets** (hardcoded credentials). Generates SBOM automatically. |
+| `scan_artifact` | **Comprehensive artifact security:** scans directories, container images, or SBOM files. Three scan types: **vulnerability** (dependency CVEs), **malware** (supply chain attacks), **secrets** (hardcoded credentials). Supports 25+ ecosystems. |
 
-**Scan types** (can be combined or used individually):
-- `vulnerability` — Find CVEs in dependencies across 25+ ecosystems (default)
-- `malware` — Detect trojans, ransomware, backdoors in packages (use for untrusted sources)
-- `secrets` — Find hardcoded API keys, tokens, passwords, credentials in code (default)
-- **Default:** `["vulnerability", "secrets"]`
+<details>
+<summary>Artifact scanner details</summary>
+
+**Scan types** (can be combined):
+- `vulnerability` — Find CVEs in dependencies (default)
+- `malware` — Detect trojans, ransomware, backdoors in packages
+- `secrets` — Find hardcoded API keys, tokens, passwords (default)
 
 **Supported ecosystems:** npm, pip, Maven, Go, Rust, Ruby, NuGet, PHP Composer, Cargo, Bundler, plus OS packages in Alpine, Debian, Ubuntu, Amazon Linux, Red Hat, etc.
 
@@ -88,35 +169,36 @@ Your AI assistant uses v1vibe to scan files, check dependencies, analyze URLs, s
 - Container images: `registry:myrepo/image:tag`, `docker:image:tag`, `podman:image:tag`
 - OCI directories: `oci-dir:/path/to/oci`
 - Archives: `docker-archive:image.tar`, `oci-archive:image.tar`
+</details>
 
-**Additional options:**
-- Pass extra TMAS CLI arguments via `additional_args` (e.g., `--region us-east-1`)
-
-### ☁️ Infrastructure as Code Scanning with Compliance Mapping
+### ☁️ Infrastructure as Code Scanning
 | Tool | What it does |
 |------|-------------|
-| `list_compliance_standards` | List available compliance frameworks (CIS Benchmarks, NIST, PCI-DSS, HIPAA, AWS Well-Architected, etc.) |
-| `list_compliance_profiles` | List compliance profiles for targeted scanning (returns profile IDs for specific frameworks) |
-| `scan_iac_template` | Scan CloudFormation (YAML/JSON) or Terraform plan (JSON) for security misconfigurations. **Automatically maps each finding to ALL applicable compliance standards** (shows which CIS/NIST/PCI-DSS controls are violated). Optional: scan against specific compliance profile. |
-| `scan_terraform_archive` | Scan ZIP of Terraform HCL (.tf) files for security misconfigurations with automatic compliance mapping |
+| `list_compliance_standards` | List available compliance frameworks (45 total: CIS, NIST, PCI-DSS, HIPAA, AWS Well-Architected, etc.) |
+| `list_compliance_profiles` | List compliance profiles for targeted scanning |
+| `scan_iac_template` | Scan CloudFormation (YAML/JSON) or Terraform plan (JSON) for misconfigurations. **Automatically maps findings to ALL applicable compliance standards.** |
+| `scan_terraform_archive` | Scan ZIP of Terraform HCL (.tf) files with automatic compliance mapping |
 
-**Compliance Mapping** (automatic): Every finding includes a `complianceStandards` array showing which regulatory requirements it violates across ALL frameworks (CIS, NIST, AWS Well-Architected, PCI-DSS, HIPAA, ISO 27001, etc.). No configuration needed - just scan your templates and get compliance context automatically.
+<details>
+<summary>Compliance mapping details</summary>
 
-**Targeted Scanning** (optional): Scan against a specific compliance profile (e.g., CIS AWS Foundations) by passing a `profile_id` parameter. Use `list_compliance_profiles()` to find available profiles.
+**Automatic compliance mapping:** Every IaC finding includes a `complianceStandards` array showing which regulatory requirements it violates across ALL frameworks (CIS, NIST, AWS Well-Architected, PCI-DSS, HIPAA, ISO 27001, etc.). No configuration needed.
+
+**Targeted scanning (optional):** Scan against a specific compliance profile (e.g., CIS AWS Foundations) by passing a `profile_id` parameter.
+
+**45 supported standards** including:
+- Multi-cloud: CIS Controls v8, NIST 800-53, PCI-DSS, HIPAA, ISO 27001, SOC 2, FEDRAMP
+- AWS: AWS Well-Architected, CIS AWS Foundations (v3-v7)
+- Azure: Azure Well-Architected, CIS Azure Foundations
+- GCP: Google Cloud Well-Architected, CIS GCP Foundations
+- And many more (GDPR, LGPD, MAS, NIS-2, etc.)
+</details>
 
 ### 🔎 Threat Intelligence
 | Tool | What it does |
 |------|-------------|
-| `search_threat_indicators` | **NEW:** Search global threat indicators from TrendAI feed. Cached locally with hourly delta updates. **Detects all IOC types:** file hashes (SHA256/SHA1/MD5), domains, IPs, URLs, network traffic, email addresses, Windows registry keys, mutexes, file paths, hostnames, process names. **Instant lookups** — scan every IP, domain, URL, hash, email, registry key, mutex in your project against global threat intelligence. |
+| `search_threat_indicators` | Search 266K+ global threat indicators from TrendAI feed. Cached locally with hourly updates. Detects: file hashes, domains, IPs, URLs, email addresses, Windows registry keys, mutexes, file paths. **Instant lookups.** |
 | `check_suspicious_objects` | Check URLs, domains, IPs, email addresses, or file hashes against your organization's custom blocklist |
-
-**Scan deeply for IOCs in your projects:**
-- **Hardcoded IPs/domains/URLs** in source code, configs, scripts
-- **File hashes** in build artifacts, checksums, download lists
-- **Email addresses** in configs, templates, sender validation
-- **Registry keys** in Windows scripts, installers, PowerShell
-- **Mutexes** in malware analysis code, synchronization primitives
-- **File paths** in scripts (detect known malware installation paths)
 
 ### 🛡️ Vulnerabilities
 | Tool | What it does |
@@ -128,100 +210,7 @@ Your AI assistant uses v1vibe to scan files, check dependencies, analyze URLs, s
 |------|-------------|
 | `get_submission_quota` | Check remaining daily sandbox submission quota (10,000/day default) |
 
-## Quick Start
-
-### Option 1: Install directly from GitHub
-
-```bash
-# With uv (recommended)
-uv tool install git+https://github.com/arcaniusdev/v1vibe.git
-
-# Or with pipx
-pipx install git+https://github.com/arcaniusdev/v1vibe.git
-
-# Or with pip
-pip install git+https://github.com/arcaniusdev/v1vibe.git
-
-# Run setup
-v1vibe setup
-```
-
-### Option 2: Install from source
-
-```bash
-# Clone the repository
-git clone https://github.com/arcaniusdev/v1vibe.git
-cd v1vibe
-
-# Install with uv (recommended)
-uv tool install .
-
-# Or install with pipx
-pipx install .
-
-# Or install with pip
-pip install .
-
-# Run setup
-v1vibe setup
-```
-
-The setup wizard will:
-
-1. Prompt for your Vision One API token and region
-2. Test connectivity
-3. **Install TMAS CLI** (TrendAI Artifact Scanner) for dependency/secret/container scanning
-   - **macOS:** Detects Docker availability and offers automated installation via Homebrew if needed
-   - **Linux/Windows:** Downloads and installs native TMAS binary
-4. Save config to `~/.v1vibe/config.json` (includes TMAS binary path)
-5. Register as an MCP server with Claude Code (if installed)
-6. Add CLAUDE.md instructions so Claude proactively uses v1vibe
-
-After setup, verify everything works:
-
-```bash
-v1vibe test     # smoke test all capabilities
-v1vibe status   # show config, connectivity, and quota
-```
-
-## Prerequisites
-
-**System requirements:**
-- Python 3.10 or higher
-- One of: `pip`, `uv`, or `pipx` (for installation)
-- Internet connection (for downloading TMAS CLI during setup)
-- **macOS users:** Docker Desktop (for artifact scanning)
-  - TMAS CLI requires a Linux environment and runs in a container on macOS
-  - The setup wizard automatically detects missing Docker and offers to install it via Homebrew
-  - If Homebrew is also missing, setup can install it first (fully automated flow)
-
-**Vision One account:**
-- A [TrendAI Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html) account
-- An API key with these permissions:
-  - Sandbox Analysis (Submit object, View/filter/search)
-  - File Security (Run file scan via SDK)
-  - AI Guard (Call detection API)
-  - **AI Scanner** — for LLM vulnerability testing (jailbreaks, prompt injection)
-  - Threat Intelligence (View)
-  - **Container Security > Run artifacts scan** — for dependency/secret/container scanning
-
-**Python dependencies** (automatically installed):
-- `mcp[cli]>=1.20.0` — MCP server framework
-- `httpx>=0.27.0` — HTTP client for REST API
-- `visionone-filesecurity>=1.4.0` — File Security gRPC SDK
-
-### Getting your API key
-
-1. Log in to [TrendAI Vision One](https://portal.xdr.trendmicro.com)
-2. Navigate to **Administration > API Keys**
-3. Click **Add API Key**
-4. Assign a role with these permissions:
-   - Threat Intelligence > Sandbox Analysis (Submit object, View/filter/search)
-   - File Security > Run file scan via SDK
-   - AI Application Security > AI Guard > Call detection API
-   - **AI Application Security > AI Scanner** (for LLM vulnerability testing)
-   - Threat Intelligence > Suspicious Object Management (View)
-   - **Container Security > Run artifacts scan** (for TMAS artifact scanning)
+</details>
 
 ## CLI Commands
 
@@ -237,15 +226,18 @@ v1vibe status   # show config, connectivity, and quota
 ## Configuration
 
 v1vibe stores configuration and binaries in `~/.v1vibe/`:
-
 - `config.json` — API token, region, TMAS binary path
 - `bin/tmas` — TMAS CLI binary (auto-installed during setup)
 
 **Configuration priority:**
-1. **Environment variables**: `V1_API_TOKEN` and `V1_REGION`
-2. **Config file**: `~/.v1vibe/config.json` (created by `v1vibe setup`)
+1. Environment variables: `V1_API_TOKEN` and `V1_REGION`
+2. Config file: `~/.v1vibe/config.json` (created by `v1vibe setup`)
 
-**Using environment variables** (useful for CI/CD or if you prefer not to use the setup wizard):
+<details>
+<summary><b>⚙️ Using environment variables</b></summary>
+
+Useful for CI/CD or if you prefer not to use the setup wizard:
+
 ```bash
 export V1_API_TOKEN="your-api-token"
 export V1_REGION="us-east-1"
@@ -253,10 +245,9 @@ v1vibe test
 ```
 
 **Supported regions:** `us-east-1`, `eu-central-1`, `ap-southeast-1`, `ap-northeast-1`, `ap-southeast-2`, `ap-south-1`, `me-south-1`, `eu-west-2`, `ca-central-1`
+</details>
 
 ## Upgrading
-
-To upgrade v1vibe to the latest version:
 
 ```bash
 # If installed with uv (recommended)
@@ -269,7 +260,9 @@ pipx upgrade v1vibe
 pip install --upgrade v1vibe
 ```
 
-**For GitHub installs:**
+<details>
+<summary><b>🔄 Upgrading GitHub installs</b></summary>
+
 ```bash
 # uv
 uv tool upgrade --reinstall v1vibe
@@ -286,18 +279,19 @@ pip install --upgrade --force-reinstall git+https://github.com/arcaniusdev/v1vib
 2. TMAS CLI binary is automatically updated if needed
 3. MCP server registration remains intact
 4. Run `v1vibe status` to verify the new version
-
-**Check your current version:**
-```bash
-v1vibe --version  # or v1vibe status
-```
+</details>
 
 ## Uninstalling
 
 ```bash
-v1vibe uninstall  # Removes config, TMAS binary, MCP registration, CLAUDE.md instructions
-uv tool uninstall v1vibe  # Then remove the Python package
+v1vibe uninstall         # Removes config, TMAS binary, MCP registration, CLAUDE.md instructions
+uv tool uninstall v1vibe # Then remove the Python package
 ```
+
+---
+
+<details>
+<summary><b>🔧 Advanced Configuration</b></summary>
 
 ## Manual Setup
 
@@ -385,7 +379,7 @@ uv run v1vibe test
 ## Architecture
 
 - `src/v1vibe/cli.py` — CLI entry point: setup wizard (with TMAS install), test, status, uninstall
-- `src/v1vibe/server.py` — FastMCP server with 16 tools + 11 prompts
+- `src/v1vibe/server.py` — FastMCP server with 18 tools + 11 prompts
 - `src/v1vibe/config.py` — Settings, region mapping, config file I/O (includes TMAS path)
 - `src/v1vibe/clients.py` — gRPC + httpx client lifecycle (lifespan context)
 - `src/v1vibe/utils.py` — Error formatting, response helpers
@@ -394,11 +388,13 @@ uv run v1vibe test
   - `sandbox.py` — File/URL sandbox analysis (REST v3.0)
   - `artifact_scanner.py` — Dependency/secret/container scanning (TMAS CLI wrapper)
   - `ai_guard.py` — AI content safety (REST v3.0)
-  - `ai_scanner.py` — **NEW:** LLM vulnerability testing (TMAS CLI wrapper) - auto-detection, jailbreaks, prompt injection
-  - `threat_intel.py` — Suspicious object lookup (REST v3.0)
+  - `ai_scanner.py` — LLM vulnerability testing (TMAS CLI wrapper)
+  - `threat_intel.py` — Threat intelligence lookups (REST v3.0)
   - `iac_scanner.py` — Infrastructure security (REST beta)
   - `vulnerabilities.py` — CVE details (REST v3.0)
 
 ## License
 
 MIT
+
+</details>
