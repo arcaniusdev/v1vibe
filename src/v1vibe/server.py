@@ -70,12 +70,23 @@ When the user asks for any kind of security review, check, or scan, you MUST com
 EVERY applicable step below. Do NOT skip steps. Do NOT stop after the first few. \
 Each step targets a different attack surface — skipping any one leaves a gap.
 
-### 1. MALWARE SCAN — scan every file
-Find ALL files in the project: source code (.py, .js, .ts, .java, .go, .rs, .c, .rb, .php, etc.), \
-scripts (.sh, .ps1, .bat), configs (.json, .yaml, .toml, .xml), documents (.pdf, .doc, .xls), \
-archives (.zip, .jar, .war), and binaries.
-→ Run `scan_file` on EACH file. This is fast (seconds). Do not skip any.
-→ Report: total files scanned, any with scanResult != 0.
+### 1. MALWARE SCAN — scan every file [REQUIRED - CANNOT SKIP]
+**STEP 1a: Discover ALL files**
+Use this exact command to find files (excludes .venv, .git, node_modules, __pycache__):
+```bash
+find . -type f -not -path "*/.venv/*" -not -path "*/.git/*" -not -path "*/node_modules/*" \\
+  -not -path "*/__pycache__/*" -not -path "*/.pytest_cache/*" | head -100
+```
+OR use Glob patterns: `**/*.py`, `**/*.js`, `**/*.{json,yaml,toml}`, etc.
+
+**STEP 1b: Scan EVERY file found**
+→ Run `scan_file` on EACH file path from step 1a. This is FAST (seconds per file). Do NOT batch. Do NOT skip.
+→ **VALIDATION:** If you scanned fewer than 10 files in a typical project, you MISSED files. Go back to step 1a.
+→ **CHECKPOINT:** Report "Scanned X files" BEFORE moving to step 2.
+→ Report: total files scanned, any with scanResult != 0, malware names, file SHA256.
+
+**WHY THIS MATTERS:** The gRPC file scanner is fast (<1 second per file). Scanning 50 files takes ~50 seconds. \
+There is NO performance reason to skip files. Every skipped file is a potential backdoor you missed.
 
 ### 2. URL CHECK — find and check every URL
 Search ALL project files for URLs: API endpoints, download links, webhook URLs, \
@@ -735,10 +746,16 @@ def security_review(project_path: str = ".") -> str:
 CRITICAL: You MUST complete ALL applicable steps below. Do NOT skip any step. Do NOT stop early.
 Each step covers a different attack surface. A step returning clean results is valid and expected.
 
-## Step 1: MALWARE SCAN
-Find ALL files in the project (source code, scripts, configs, documents, archives, binaries).
-→ Use `scan_file` on EACH file. Fast (seconds per file).
-→ Report: total files scanned, any with scanResult != 0, malware names, file hashes.
+## Step 1: MALWARE SCAN [REQUIRED - CANNOT SKIP]
+**1a. Discover ALL files** - Use this command to find files (excludes .venv, .git, caches):
+```bash
+find . -type f -not -path "*/.venv/*" -not -path "*/.git/*" -not -path "*/node_modules/*" \\
+  -not -path "*/__pycache__/*" | head -100
+```
+**1b. Scan EVERY file** - Call `scan_file` on EACH file path. Fast (1 second per file).
+**1c. VALIDATE** - If you scanned <10 files in a typical project, you MISSED files. Redo discovery.
+**1d. CHECKPOINT** - Report "Scanned X files" before proceeding to step 2.
+→ Report: total files scanned, any with scanResult != 0, malware names, file SHA256.
 
 ## Step 2: URL VALIDATION
 Search ALL files for URLs (API endpoints, downloads, webhooks, CDN, OAuth, dependencies).
@@ -886,23 +903,29 @@ Uses File Security SDK (signature-based detection) to scan files for:
 - Malicious scripts and documents
 
 ## Step 1: Find files to scan
-{"Use the provided file paths." if file_paths else f"""Find ALL files in {project_path}:
+{"Use the provided file paths." if file_paths else f"""Find ALL files in {project_path} using:
+```bash
+find {project_path} -type f -not -path "*/.venv/*" -not -path "*/.git/*" \\
+  -not -path "*/node_modules/*" -not -path "*/__pycache__/*" | head -100
+```
+This discovers:
 - Source code (.py, .js, .ts, .java, .go, .rs, .c, .cpp, .rb, .php, etc.)
 - Scripts (.sh, .bash, .ps1, .bat, .cmd)
 - Config files (.json, .yaml, .yml, .toml, .xml)
 - Documents (.pdf, .doc, .docx, .xls, .xlsx, .ppt)
 - Archives (.zip, .tar, .gz, .7z, .rar, .jar, .war)
 - Binaries and executables
-- Any other files"""}
+
+**VALIDATION:** If <10 files found in a typical project, you MISSED files. Rerun discovery."""}
 
 ## Step 2: Scan each file
-For EACH file:
+For EACH file discovered in step 1:
 → Use `scan_file` with:
-  - file_path = absolute path
+  - file_path = absolute path to the file
   - tags = ["project_scan"] (optional, for tracking)
   - pml = true (enables ML detection for novel malware variants)
 
-Fast (seconds per file). Accepts ANY file type.
+Fast (~1 second per file). Accepts ANY file type. Do NOT skip files.
 
 ## Step 3: Analyze results
 For each scanned file, check:
@@ -911,10 +934,13 @@ For each scanned file, check:
 - **fileSHA1**, **fileSHA256**: File hashes (use for threat intel lookup)
 
 ## Step 4: Report
+**CHECKPOINT:** Report total file count FIRST before detailing findings.
+
 Provide summary:
-- Total files scanned
+- **Total files scanned** (MUST be reported)
 - Clean files count
 - Detections: filename, malware names, file hash, risk level
+- If 0 detections: explicitly state "All X files are clean"
 - Recommendation: quarantine/delete infected files, investigate further
 
 ## When to use behavioral analysis instead
