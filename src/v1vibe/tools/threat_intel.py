@@ -297,12 +297,12 @@ async def search_threat_indicators(
     indicator_value: str,
 ) -> dict[str, Any]:
     """
-    Search Trend Micro threat intelligence feed for a specific indicator of compromise (IOC).
+    Search TrendAI threat intelligence feed for a specific indicator of compromise (IOC).
 
     Searches the complete threat intelligence feed (71K+ indicators from last 365 days)
     for matches. The feed is cached locally (~29MB) and refreshed hourly with delta updates.
 
-    This provides instant lookups against global threat intelligence from Trend Micro,
+    This provides instant lookups against global threat intelligence from TrendAI,
     complementing check_suspicious_objects (tenant blocklist) and sandbox_submit_url.
 
     **Indicator types automatically detected** (71K+ total indicators):

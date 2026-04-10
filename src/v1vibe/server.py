@@ -221,7 +221,7 @@ async def scan_file(
     tags: list[str] | None = None,
     pml: bool = False,
 ) -> dict:
-    """Scan a local file for malware using Trend Micro File Security.
+    """Scan a local file for malware using TrendAI File Security.
 
     Returns scan verdict with malware names and SHA1/SHA256 hashes.
     Fast (seconds). Use for any file your code produces or downloads.
@@ -242,7 +242,7 @@ async def sandbox_submit_file(
     archive_password: str | None = None,
     arguments: str | None = None,
 ) -> dict:
-    """Submit a file to Trend Micro sandbox for deep behavioral analysis (detonation).
+    """Submit a file to TrendAI sandbox for deep behavioral analysis (detonation).
 
     Returns a task ID to check status later with sandbox_get_status.
     Only files with supported extensions can be sandboxed — unsupported types will be
@@ -272,7 +272,7 @@ async def sandbox_submit_url(
     ctx: Context,
     urls: list[str],
 ) -> dict:
-    """Submit up to 10 URLs to Trend Micro sandbox for analysis.
+    """Submit up to 10 URLs to TrendAI sandbox for analysis.
 
     Returns per-URL task IDs. Use to check if URLs referenced in code,
     configs, or dependencies are malicious.
@@ -327,7 +327,7 @@ async def ai_guard_evaluate(
     prompt: str,
     application_name: str = "v1vibe",
 ) -> dict:
-    """Evaluate text against Trend Micro AI Guard security policies.
+    """Evaluate text against TrendAI AI Guard security policies.
 
     Detects harmful content, sensitive information leakage (PII, credentials),
     and prompt injection attacks. Returns Allow/Block action with detailed
@@ -367,7 +367,7 @@ async def search_threat_indicators(
     ctx: Context,
     indicator_value: str,
 ) -> dict:
-    """Search Trend Micro threat intelligence feed for a specific indicator.
+    """Search TrendAI threat intelligence feed for a specific indicator.
 
     Searches the complete threat intelligence feed for matches. The feed is cached
     locally and refreshed hourly with delta updates.

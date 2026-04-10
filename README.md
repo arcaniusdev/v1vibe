@@ -1,6 +1,6 @@
 # v1vibe
 
-A comprehensive security validation MCP server powered by [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Provides AI coding assistants with real-time security scanning across **files, dependencies, containers, infrastructure, URLs, and AI content** — all from within your coding workflow.
+A comprehensive security validation MCP server powered by [TrendAI Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html). Provides AI coding assistants with real-time security scanning across **files, dependencies, containers, infrastructure, URLs, and AI content** — all from within your coding workflow.
 
 **What it does:**
 - 🦠 **Malware Detection** — Scan files and dependencies for trojans, ransomware, spyware
@@ -9,7 +9,7 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 - 🐳 **Container Security** — Scan Docker images and registries for vulnerabilities
 - 🌐 **URL Analysis** — Sandbox and analyze URLs for malicious behavior
 - ☁️ **IaC Security** — Scan CloudFormation and Terraform for misconfigurations
-- 🔎 **Threat Intelligence** — Search global threat indicators (domains, IPs, URLs, file hashes, registry keys, mutexes, email addresses) from Trend Micro threat feed. Cached locally with hourly delta updates for instant lookups.
+- 🔎 **Threat Intelligence** — Search global threat indicators (domains, IPs, URLs, file hashes, registry keys, mutexes, email addresses) from TrendAI threat feed. Cached locally with hourly delta updates for instant lookups.
 - 🤖 **AI Safety** — Validate AI prompts and chatbot content for harmful content and prompt injection
 
 ## Features (13 tools)
@@ -54,7 +54,7 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 ### 🔎 Threat Intelligence
 | Tool | What it does |
 |------|-------------|
-| `search_threat_indicators` | **NEW:** Search global threat indicators from Trend Micro feed. Cached locally with hourly delta updates. **Detects all IOC types:** file hashes (SHA256/SHA1/MD5), domains, IPs, URLs, network traffic, email addresses, Windows registry keys, mutexes, file paths, hostnames, process names. **Instant lookups** — scan every IP, domain, URL, hash, email, registry key, mutex in your project against global threat intelligence. |
+| `search_threat_indicators` | **NEW:** Search global threat indicators from TrendAI feed. Cached locally with hourly delta updates. **Detects all IOC types:** file hashes (SHA256/SHA1/MD5), domains, IPs, URLs, network traffic, email addresses, Windows registry keys, mutexes, file paths, hostnames, process names. **Instant lookups** — scan every IP, domain, URL, hash, email, registry key, mutex in your project against global threat intelligence. |
 | `check_suspicious_objects` | Check URLs, domains, IPs, email addresses, or file hashes against your organization's custom blocklist |
 
 **Scan deeply for IOCs in your projects:**
@@ -122,7 +122,7 @@ The setup wizard will:
 
 1. Prompt for your Vision One API token and region
 2. Test connectivity
-3. **Install TMAS CLI** (Trend Micro Artifact Scanner) for dependency/secret/container scanning
+3. **Install TMAS CLI** (TrendAI Artifact Scanner) for dependency/secret/container scanning
    - **macOS:** Detects Docker availability and offers automated installation via Homebrew if needed
    - **Linux/Windows:** Downloads and installs native TMAS binary
 4. Save config to `~/.v1vibe/config.json` (includes TMAS binary path)
@@ -148,7 +148,7 @@ v1vibe status   # show config, connectivity, and quota
   - If Homebrew is also missing, setup can install it first (fully automated flow)
 
 **Vision One account:**
-- A [Trend Micro Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html) account
+- A [TrendAI Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html) account
 - An API key with these permissions:
   - Sandbox Analysis (Submit object, View/filter/search)
   - File Security (Run file scan via SDK)
@@ -163,7 +163,7 @@ v1vibe status   # show config, connectivity, and quota
 
 ### Getting your API key
 
-1. Log in to [Trend Vision One](https://portal.xdr.trendmicro.com)
+1. Log in to [TrendAI Vision One](https://portal.xdr.trendmicro.com)
 2. Navigate to **Administration > API Keys**
 3. Click **Add API Key**
 4. Assign a role with these permissions:

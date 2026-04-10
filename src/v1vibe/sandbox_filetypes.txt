@@ -2,7 +2,7 @@
 # One extension per line (with leading dot). Lines starting with # are comments.
 # Update this file to add/remove supported file types without changing code.
 #
-# Source: Trend Micro Vision One documentation + confirmed support (2026)
+# Source: TrendAI Vision One documentation + confirmed support (2026)
 
 # Executables & libraries
 .exe
