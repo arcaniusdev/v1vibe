@@ -68,13 +68,17 @@ async def app_lifespan(server: Any) -> AsyncIterator[AppContext]:
         )
         yield AppContext(settings=settings, grpc_handle=grpc_handle, http=http)
     finally:
+        # Clean up clients even if initialization partially failed or usage errored
+        # Try to close each client independently - one failure shouldn't prevent the other
         if http:
             try:
                 await http.aclose()
             except Exception:
+                # Don't propagate cleanup errors - just warn
                 print("v1vibe: warning: failed to close HTTP client", file=sys.stderr)
         if grpc_handle:
             try:
                 await amaas_aio.quit(grpc_handle)
             except Exception:
+                # Don't propagate cleanup errors - just warn
                 print("v1vibe: warning: failed to close gRPC channel", file=sys.stderr)

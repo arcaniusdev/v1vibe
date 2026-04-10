@@ -175,36 +175,39 @@ async def _ensure_feed_cache(ctx: AppContext) -> ThreatFeedCache:
 
     The cache is stored in AppContext for the session and persisted to disk.
     """
-    # Check if we already have cache in memory for this session
+    # Session cache: load once per AppContext lifespan, reuse for all searches
+    # This avoids re-reading the ~29MB JSON file on every search
     if not hasattr(ctx, "_threat_feed_cache"):
         ctx._threat_feed_cache = _load_cache_from_disk()
 
     cache = ctx._threat_feed_cache
 
-    # Check if refresh needed
+    # Check if cache is still fresh (< 1 hour old)
     if not cache.is_expired():
         return cache
 
-    # Fetch new indicators
+    # Cache is stale - refresh it
     if cache.last_updated_at and cache.indicators:
-        # Delta update: fetch only new indicators since last update
+        # Delta update: fetch only NEW indicators since last refresh
+        # This is much faster than re-downloading all 71K indicators
         new_indicators = await _fetch_threat_feed(ctx, cache.last_updated_at)
 
         if new_indicators:
-            # Merge with existing, deduplicate by ID
+            # Merge new indicators with existing, avoiding duplicates
+            # Some indicators may appear in multiple fetches if they were updated
             existing_ids = {ind["id"] for ind in cache.indicators}
             unique_new = [ind for ind in new_indicators if ind["id"] not in existing_ids]
             cache.indicators.extend(unique_new)
     else:
-        # Full refresh: fetch everything
+        # First time or cache corrupted - do a full refresh
         cache.indicators = await _fetch_threat_feed(ctx)
         cache.first_fetched_at = datetime.now(timezone.utc)
 
-    # Update metadata
+    # Update cache metadata
     cache.last_updated_at = datetime.now(timezone.utc)
     cache.total_count = len(cache.indicators)
 
-    # Save to disk
+    # Persist to disk for next session (atomic write via temp file)
     _save_cache_to_disk(cache)
 
     return cache
@@ -237,31 +240,33 @@ def _extract_indicator_value(pattern: str) -> tuple[str | None, str | None]:
     Returns:
         Tuple of (indicator_type, value) or (None, None) if pattern can't be parsed
     """
-    # Handle network-traffic patterns (they reference domains/IPs)
+    # Special case: network-traffic patterns use nested references
+    # Example: [network-traffic:dst_ref.value = 'evil.com']
     if "[network-traffic:dst_ref.value = " in pattern:
         match = re.search(r"dst_ref\.value\s*=\s*'([^']+)'", pattern)
         if match:
             value = match.group(1)
-            # Could be domain or IP, let caller determine
+            # Could be domain or IP - caller determines type from value format
             return "network_traffic_dest", value
 
     # Standard STIX pattern format: [type:property = 'value']
+    # Example: [domain-name:value = 'example.com']
     match = re.search(r"\[([^:]+):([^\]]+)\]", pattern)
     if not match:
         return None, None
 
-    stix_type = match.group(1).strip()
-    rest = match.group(2).strip()
+    stix_type = match.group(1).strip()  # e.g., "domain-name"
+    rest = match.group(2).strip()       # e.g., "value = 'example.com'"
 
-    # Extract value from "property = 'value'" format
+    # Extract the value from "property = 'value'" format
     value_match = re.search(r"=\s*'([^']+)'", rest)
     if not value_match:
         return None, None
 
     value = value_match.group(1)
 
-    # Map STIX types to our indicator types
-    # For file hashes, preserve the hash type
+    # Special handling for file hashes - preserve the specific hash type
+    # Example: [file:hashes.SHA256 = 'abc123...']
     if stix_type == "file":
         if "hashes.SHA256" in rest:
             return "file_hash_sha256", value
@@ -272,8 +277,10 @@ def _extract_indicator_value(pattern: str) -> tuple[str | None, str | None]:
         elif "name" in rest:
             return "file_name", value
         else:
+            # Generic file hash (unknown type)
             return "file_hash", value
 
+    # Map STIX types to our simplified indicator types
     type_map = {
         "domain-name": "domain",
         "url": "url",

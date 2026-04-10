@@ -170,10 +170,11 @@ async def scan_artifact(
             # Use validated path
             artifact_abs = artifact_validated
 
-            # Validate additional_args to prevent command injection
+            # Security: Validate additional_args to prevent command injection
             validated_extra_args = []
             if additional_args:
-                # Reject any additional_args with shell metacharacters
+                # First pass: reject any args with shell metacharacters that could break out
+                # Even with shlex.quote, we're extra cautious since this runs in Docker
                 if any(char in additional_args for char in [";", "|", "&", "$", "`", "(", ")", "<", ">"]):
                     return {
                         "error": {
@@ -181,20 +182,21 @@ async def scan_artifact(
                             "message": "additional_args contains unsafe shell metacharacters",
                         }
                     }
-                # Quote each argument for safe shell usage
+                # Second pass: quote each argument individually for safe shell usage
                 for arg in additional_args.split():
                     validated_extra_args.append(shlex.quote(arg))
 
-            # Determine artifact type and how to scan it
+            # Determine artifact type - directories need volume mounts, images don't
             is_directory = not any(
                 artifact_validated.startswith(p)
                 for p in ["registry:", "docker:", "docker-archive:", "oci-archive:", "oci-dir:", "podman:"]
             )
 
-            # Build Docker command base
+            # Build Docker command - we'll run TMAS inside an Ubuntu container
             cmd = ["docker", "run", "--rm"]
 
             # Configure volume mounts based on artifact type
+            # Each type needs different access (filesystem, Docker socket, etc.)
             if is_directory:
                 # Mount directory for scanning
                 cmd.extend(["-v", f"{artifact_abs}:/scan:ro"])
@@ -216,16 +218,16 @@ async def scan_artifact(
                 # registry:, oci-dir:, podman: - pass through directly (network access only)
                 scan_target = shlex.quote(artifact_validated)
 
-            # Common mounts and environment
+            # Common mounts and environment for all artifact types
             cmd.extend([
-                "-v", f"{tmpdir}:/output",  # Mount output directory
-                "-e", f"TMAS_API_KEY={ctx.settings.api_token}",
-                "-w", "/tmp",
+                "-v", f"{tmpdir}:/output",  # Mount temp dir for TMAS output JSON
+                "-e", f"TMAS_API_KEY={ctx.settings.api_token}",  # Pass API key securely
+                "-w", "/tmp",  # Working directory inside container
                 DOCKER_IMAGE,
-                "sh", "-c",
+                "sh", "-c",  # Run shell command inside container
             ])
 
-            # Build the shell command to run inside container with proper escaping
+            # Build scan flags based on requested scan types
             tmas_flags = []
             if "vulnerability" in scan_types:
                 tmas_flags.append("-V")
@@ -234,15 +236,15 @@ async def scan_artifact(
             if "secrets" in scan_types:
                 tmas_flags.append("-S")
 
-            # Region is already validated by Settings, but quote it for safety
+            # Region is already validated by Settings class, but quote for defense in depth
             region_quoted = shlex.quote(ctx.settings.region)
 
-            # Skip region if it's in additional_args (avoid duplication)
+            # Avoid --region duplication if user already specified it
             include_region = not (additional_args and "--region" in additional_args)
 
-            # Build shell command with proper quoting
-            # Note: Internal shell variables like $ARCH are intentionally not quoted
-            # The URL is safe because we control TMAS_VERSION and the base URL is hardcoded
+            # Build shell command to run inside container
+            # Note: $ARCH is a shell variable expanded inside the container, not here
+            # The URL is safe - TMAS_VERSION is a constant and base URL is hardcoded
             tmas_url = f"https://ast-cli.xdr.trendmicro.com/tmas-cli/{TMAS_VERSION}/tmas-cli_Linux_$ARCH.tar.gz"
 
             shell_cmd_parts = [
