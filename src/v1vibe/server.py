@@ -397,18 +397,26 @@ async def scan_artifact(
     - Scanning project directories for dependency vulnerabilities and secrets
     - Analyzing container images for CVEs before deployment
     - Checking for hardcoded credentials, API keys, tokens in code
+    - Detecting supply chain attacks (trojans, backdoors in dependencies)
     - Generating SBOM for compliance and supply chain security
+
+    Scan types (can be combined):
+    - "vulnerability" — Find CVEs in dependencies (included by default)
+    - "malware" — Detect trojans, ransomware, backdoors in packages (use for untrusted sources)
+    - "secrets" — Find hardcoded API keys, tokens, passwords in code (included by default)
+    Default: ["vulnerability", "secrets"]
 
     Supported artifacts:
     - Directories: "dir:/path/to/project" or just "/path/to/project"
-    - Container images: "registry:myrepo/image:tag", "docker:image:tag"
+    - Container images: "registry:myrepo/image:tag", "docker:image:tag", "podman:image:tag"
+    - OCI directories: "oci-dir:/path/to/oci"
     - Archives: "docker-archive:image.tar", "oci-archive:image.tar"
 
     Args:
         artifact: Path to artifact (directory, image reference, or archive).
         scan_types: Scan types to run. Options: "vulnerability", "malware", "secrets".
                    Default: ["vulnerability", "secrets"]
-        additional_args: Extra CLI arguments (e.g., "--region us-east-1").
+        additional_args: Extra CLI arguments (e.g., "--region us-east-1", "--output-format json").
 
     Returns:
         Scan results including CVEs with CVSS scores, malware detections,

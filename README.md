@@ -26,14 +26,24 @@ A comprehensive security validation MCP server powered by [Trend Micro Vision On
 ### 🔍 Dependency, Container & Secret Scanning (NEW)
 | Tool | What it does |
 |------|-------------|
-| `scan_artifact` | **Comprehensive artifact security:** scans directories, container images, or SBOM files for (1) dependency CVEs in 25+ ecosystems, (2) malware in packages, (3) hardcoded secrets. Generates SBOM automatically. |
+| `scan_artifact` | **Comprehensive artifact security:** scans directories, container images, or SBOM files using TMAS CLI. Three scan types available: **vulnerability** (dependency CVEs), **malware** (supply chain attacks in packages), and **secrets** (hardcoded credentials). Generates SBOM automatically. |
+
+**Scan types** (can be combined or used individually):
+- `vulnerability` — Find CVEs in dependencies across 25+ ecosystems (default)
+- `malware` — Detect trojans, ransomware, backdoors in packages (use for untrusted sources)
+- `secrets` — Find hardcoded API keys, tokens, passwords, credentials in code (default)
+- **Default:** `["vulnerability", "secrets"]`
 
 **Supported ecosystems:** npm, pip, Maven, Go, Rust, Ruby, NuGet, PHP Composer, Cargo, Bundler, plus OS packages in Alpine, Debian, Ubuntu, Amazon Linux, Red Hat, etc.
 
 **Supported artifacts:**
-- Project directories (`dir:/path` or just `/path`)
-- Container images (`registry:myrepo/image:tag`, `docker:image:tag`)
-- Archives (`docker-archive:image.tar`, `oci-archive:image.tar`)
+- Project directories: `dir:/path/to/project` or just `/path/to/project`
+- Container images: `registry:myrepo/image:tag`, `docker:image:tag`, `podman:image:tag`
+- OCI directories: `oci-dir:/path/to/oci`
+- Archives: `docker-archive:image.tar`, `oci-archive:image.tar`
+
+**Additional options:**
+- Pass extra TMAS CLI arguments via `additional_args` (e.g., `--region us-east-1`)
 
 ### ☁️ Infrastructure as Code Scanning
 | Tool | What it does |

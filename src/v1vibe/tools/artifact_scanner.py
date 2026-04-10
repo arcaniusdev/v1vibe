@@ -89,7 +89,8 @@ async def scan_artifact(
 
     Supported artifacts:
     - Directories: "dir:/path/to/project" or just "/path/to/project"
-    - Container images: "registry:myrepo/image:tag", "docker:image:tag"
+    - Container images: "registry:myrepo/image:tag", "docker:image:tag", "podman:image:tag"
+    - OCI directories: "oci-dir:/path/to/oci"
     - Archives: "docker-archive:image.tar", "oci-archive:image.tar"
 
     Args:
@@ -241,12 +242,13 @@ async def scan_artifact(
 
             # Build shell command with proper quoting
             # Note: Internal shell variables like $ARCH are intentionally not quoted
+            # The URL is safe because we control TMAS_VERSION and the base URL is hardcoded
             tmas_url = f"https://ast-cli.xdr.trendmicro.com/tmas-cli/{TMAS_VERSION}/tmas-cli_Linux_$ARCH.tar.gz"
 
             shell_cmd_parts = [
                 "apt-get update -qq && apt-get install -y -qq curl > /dev/null 2>&1 &&",
                 "ARCH=$(uname -m); [ \"$ARCH\" = \"aarch64\" ] && ARCH=\"arm64\" || true;",
-                f"curl -sL {shlex.quote(tmas_url)} | tar xz &&",
+                f"curl -sL {tmas_url} | tar xz &&",
                 f"./tmas scan {scan_target}",
                 " ".join(tmas_flags),
             ]
