@@ -8,6 +8,7 @@ v1vibe is an MCP server that gives AI assistants (Claude, GitHub Copilot, Cursor
 
 AI coding assistants are powerful, but they can't see security threats in:
 - Dependencies with known CVEs
+- Software supply chain attacks (malicious packages, trojans, backdoors)
 - Malicious files or URLs in your project  
 - Hardcoded secrets and API keys
 - Infrastructure misconfigurations
