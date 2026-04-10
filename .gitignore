@@ -19,8 +19,8 @@ docs/
 # macOS system files
 .DS_Store
 
-# Test files
-test_*.py
+# Test files (root level only - exclude temporary session tests)
+/test_*.py
 
 # Test coverage
 .coverage
