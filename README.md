@@ -171,6 +171,7 @@ v1vibe status   # show config, connectivity, and quota
   - Sandbox Analysis (Submit object, View/filter/search)
   - File Security (Run file scan via SDK)
   - AI Guard (Call detection API)
+  - **AI Scanner** — for LLM vulnerability testing (jailbreaks, prompt injection)
   - Threat Intelligence (View)
   - **Container Security > Run artifacts scan** — for dependency/secret/container scanning
 
@@ -188,6 +189,7 @@ v1vibe status   # show config, connectivity, and quota
    - Threat Intelligence > Sandbox Analysis (Submit object, View/filter/search)
    - File Security > Run file scan via SDK
    - AI Application Security > AI Guard > Call detection API
+   - **AI Application Security > AI Scanner** (for LLM vulnerability testing)
    - Threat Intelligence > Suspicious Object Management (View)
    - **Container Security > Run artifacts scan** (for TMAS artifact scanning)
 
