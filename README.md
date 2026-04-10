@@ -296,7 +296,7 @@ uv run v1vibe test
 ## Architecture
 
 - `src/v1vibe/cli.py` — CLI entry point: setup wizard (with TMAS install), test, status, uninstall
-- `src/v1vibe/server.py` — FastMCP server with 12 tools + 4 prompts
+- `src/v1vibe/server.py` — FastMCP server with 13 tools + 4 prompts
 - `src/v1vibe/config.py` — Settings, region mapping, config file I/O (includes TMAS path)
 - `src/v1vibe/clients.py` — gRPC + httpx client lifecycle (lifespan context)
 - `src/v1vibe/utils.py` — Error formatting, response helpers
