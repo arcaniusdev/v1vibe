@@ -20,15 +20,26 @@ class VersionInfo(NamedTuple):
     compatible: bool
 
 
-# Minimum compatible versions for Python 3.14 support
-# Note: visionone-filesecurity 1.4.4 constrains grpcio<1.72, which conflicts
-# with Python 3.14's requirement for grpcio>=1.75.1. This version check
-# detects the incompatibility and recommends using tmfs CLI fallback instead.
-MIN_VERSIONS = {
-    "visionone-filesecurity": "1.4.0",
-    "grpcio": "1.75.1",  # Required for Python 3.14, but incompatible with SDK
-    "protobuf": "5.29.0",  # Required for grpcio 1.75.1+
-}
+# Minimum compatible versions - Python version aware
+# Python 3.14+ requires grpcio>=1.75.1, but earlier versions work with grpcio>=1.71.0
+# When Trend Micro updates visionone-filesecurity to support Python 3.14, this will
+# automatically detect it as compatible (no code changes needed).
+def get_min_versions() -> dict[str, str]:
+    """Get minimum required versions based on current Python version."""
+    if sys.version_info >= (3, 14):
+        # Python 3.14+ requires newer grpcio/protobuf
+        return {
+            "visionone-filesecurity": "1.4.0",
+            "grpcio": "1.75.1",  # Required for Python 3.14's C API changes
+            "protobuf": "5.29.0",  # Required for grpcio 1.75.1+
+        }
+    else:
+        # Python 3.13 and earlier - standard requirements
+        return {
+            "visionone-filesecurity": "1.4.0",
+            "grpcio": "1.71.0",  # Works fine on Python 3.13
+            "protobuf": "4.25.0",  # Works fine on Python 3.13
+        }
 
 
 def parse_version(version_str: str) -> tuple[int, ...]:
@@ -57,19 +68,23 @@ def check_package_version(package: str, minimum: str) -> VersionInfo:
 def check_file_security_compatibility() -> tuple[bool, list[VersionInfo]]:
     """Check File Security SDK and dependencies for compatibility.
 
+    Uses Python-version-aware requirements to avoid false positives on Python 3.13
+    while still detecting incompatibility on Python 3.14+.
+
     Returns:
         Tuple of (all_compatible, list of VersionInfo for each package)
     """
     results = []
+    min_versions = get_min_versions()
 
     # Check File Security SDK first
-    fs_info = check_package_version("visionone-filesecurity", MIN_VERSIONS["visionone-filesecurity"])
+    fs_info = check_package_version("visionone-filesecurity", min_versions["visionone-filesecurity"])
     results.append(fs_info)
 
     # Only check dependencies if File Security is installed
     if fs_info.installed:
-        results.append(check_package_version("grpcio", MIN_VERSIONS["grpcio"]))
-        results.append(check_package_version("protobuf", MIN_VERSIONS["protobuf"]))
+        results.append(check_package_version("grpcio", min_versions["grpcio"]))
+        results.append(check_package_version("protobuf", min_versions["protobuf"]))
 
     all_compatible = all(info.compatible for info in results)
     return all_compatible, results

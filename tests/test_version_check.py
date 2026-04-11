@@ -83,13 +83,14 @@ class TestCheckFileSecurityCompatibility:
         assert len(results) == 3
         assert all(r.compatible for r in results)
 
-    def test_grpcio_incompatible(self):
-        """grpcio version too old (Python 3.14 scenario)."""
-        with patch("v1vibe.version_check.version") as mock_version:
+    def test_grpcio_incompatible_python314(self):
+        """grpcio version too old for Python 3.14."""
+        with patch("v1vibe.version_check.version") as mock_version, \
+             patch("v1vibe.version_check.sys.version_info", (3, 14, 0)):
             mock_version.side_effect = lambda pkg: {
                 "visionone-filesecurity": "1.4.4",
-                "grpcio": "1.71.2",  # Too old for Python 3.14
-                "protobuf": "4.25.3",  # Also too old
+                "grpcio": "1.71.2",  # Too old for Python 3.14 (needs 1.75.1+)
+                "protobuf": "4.25.3",  # Also too old (needs 5.29.0+)
             }[pkg]
 
             compatible, results = check_file_security_compatibility()
@@ -105,10 +106,28 @@ class TestCheckFileSecurityCompatibility:
         grpc_result = results[1]
         assert grpc_result.package == "grpcio"
         assert grpc_result.compatible is False
+        assert grpc_result.minimum == "1.75.1"  # Python 3.14 requirement
 
         protobuf_result = results[2]
         assert protobuf_result.package == "protobuf"
         assert protobuf_result.compatible is False
+        assert protobuf_result.minimum == "5.29.0"  # Python 3.14 requirement
+
+    def test_grpcio_compatible_python313(self):
+        """grpcio 1.71.2 is compatible on Python 3.13."""
+        with patch("v1vibe.version_check.version") as mock_version, \
+             patch("v1vibe.version_check.sys.version_info", (3, 13, 12)):
+            mock_version.side_effect = lambda pkg: {
+                "visionone-filesecurity": "1.4.4",
+                "grpcio": "1.71.2",  # OK for Python 3.13
+                "protobuf": "4.25.3",  # OK for Python 3.13
+            }[pkg]
+
+            compatible, results = check_file_security_compatibility()
+
+        assert compatible is True  # Should be compatible on Python 3.13
+        assert len(results) == 3
+        assert all(r.compatible for r in results)
 
     def test_filesecurity_not_installed(self):
         """File Security SDK not installed at all."""

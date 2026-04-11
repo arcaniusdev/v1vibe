@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Version checking**: Made SDK compatibility checks Python-version-aware
+  - `version_check.py`: Added `get_min_versions()` that returns different requirements based on Python version
+  - Python 3.13 and earlier: Requires grpcio>=1.71.0, protobuf>=4.25.0 (current SDK versions work)
+  - Python 3.14+: Requires grpcio>=1.75.1, protobuf>=5.29.0 (needed for C API compatibility)
+  - **Why**: Prevents false positives on Python 3.13 where grpcio 1.71.2 works fine
+  - **Forward-compatible**: When Trend Micro updates SDK for Python 3.14, it will auto-detect as compatible
+  - **Impact**: No unnecessary CLI fallback on Python 3.13, accurate detection on Python 3.14+ (2026-04-11)
+
 - **Setup wizard**: Now checks for existing tmfs CLI installation before downloading
   - `cli.py`: Added check in Step 4.5 to skip download if tmfs already exists and works
   - Avoids unnecessary re-downloads when running `v1vibe setup` multiple times
