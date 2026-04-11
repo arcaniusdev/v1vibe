@@ -596,22 +596,45 @@ def cmd_setup() -> None:
         compatible, results = check_file_security_compatibility()
 
         if not compatible:
-            # SDK is incompatible - auto-install tmfs CLI
+            # SDK is incompatible - check if tmfs CLI is already installed
             _print("  File Security SDK incompatibility detected (Python 3.14+ or grpcio conflict)")
-            _print("  Installing File Security CLI (tmfs) as fallback...")
-            _print()
 
-            tmfs_path = _install_tmfs()
-            if tmfs_path:
-                _print(f"  ✓ Installed: {tmfs_path}")
-                # Verify it works
-                version = _get_tmfs_version(tmfs_path)
+            # Check for existing tmfs installation
+            binary_name = "tmfs.exe" if platform.system() == "Windows" else "tmfs"
+            expected_path = BIN_DIR / binary_name
+
+            if expected_path.exists():
+                _print(f"  File Security CLI already installed: {expected_path}")
+                version = _get_tmfs_version(str(expected_path))
                 if version:
                     _print(f"  ✓ {version}")
-                _print("  ✓ File scanning will use tmfs CLI")
+                    _print("  ✓ File scanning will use tmfs CLI")
+                    tmfs_path = str(expected_path)
+                else:
+                    # Installed but not working - reinstall
+                    _print("  Existing installation not working, reinstalling...")
+                    tmfs_path = _install_tmfs()
+                    if tmfs_path:
+                        version = _get_tmfs_version(tmfs_path)
+                        if version:
+                            _print(f"  ✓ {version}")
+                        _print("  ✓ File scanning will use tmfs CLI")
             else:
-                _print("  ✗ Warning: tmfs installation failed. File scanning may not work.")
-                _print("    You can retry by running 'v1vibe setup' again.")
+                # Not installed - install it
+                _print("  Installing File Security CLI (tmfs) as fallback...")
+                _print()
+
+                tmfs_path = _install_tmfs()
+                if tmfs_path:
+                    _print(f"  ✓ Installed: {tmfs_path}")
+                    # Verify it works
+                    version = _get_tmfs_version(tmfs_path)
+                    if version:
+                        _print(f"  ✓ {version}")
+                    _print("  ✓ File scanning will use tmfs CLI")
+                else:
+                    _print("  ✗ Warning: tmfs installation failed. File scanning may not work.")
+                    _print("    You can retry by running 'v1vibe setup' again.")
         else:
             _print("  ✓ File Security SDK is compatible")
             _print("  ✓ File scanning will use File Security SDK (gRPC)")

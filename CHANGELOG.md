@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Setup wizard**: Now checks for existing tmfs CLI installation before downloading
+  - `cli.py`: Added check in Step 4.5 to skip download if tmfs already exists and works
+  - Avoids unnecessary re-downloads when running `v1vibe setup` multiple times
+  - If existing installation doesn't work, automatically reinstalls
+  - **Why**: Faster setup, reduces network traffic, better user experience
+  - **Impact**: Users can run setup multiple times without penalty (2026-04-11)
+
 - **README.md**: Updated uninstall documentation to show all three package managers
   - Added uninstall instructions for `uv`, `pipx`, and `pip` (previously only showed `uv`)
   - Updated setup wizard description to mention automatic tmfs CLI installation
