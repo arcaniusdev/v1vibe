@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Python 3.14 Support**: File Security CLI (tmfs) fallback for Python 3.14+ compatibility
+  - `file_security.py`: Added `_scan_file_cli()` subprocess wrapper for tmfs binary
+  - `file_security.py`: Automatic fallback from SDK → CLI → error with helpful message
+  - `cli.py`: Added `_install_tmfs()` with cross-platform binary download and extraction
+  - `cli.py`: Added `_get_tmfs_platform_info()` for OS/arch detection (Windows/Darwin/Linux)
+  - `cli.py`: Added `_get_tmfs_version()` for version verification
+  - `cli.py`: Integrated tmfs installation into setup wizard (Step 4.5)
+  - `version_check.py`: Created SDK compatibility detection module
+  - `config.py`: Added `tmfs_binary_path` to Settings dataclass
+  - `constants.py`: Added `TMFS_BASE_URL` and `TMFS_METADATA_URL`
+  - **Why**: visionone-filesecurity 1.4.4 requires grpcio<1.72, but Python 3.14 requires grpcio>=1.75.1
+  - **Impact**: Windows/macOS/Linux users on Python 3.14+ can now use file scanning via CLI fallback
+  - **Platforms**: Windows (.zip), macOS (.zip), Linux (.tar.gz) with arm64/x86_64/i386 support
+  - **Setup Flow**: Automatic SDK compatibility check → auto-install tmfs (no prompt) → download → extract → verify
+  - **User Experience**: Fully automatic - no prompts, no code changes, just run `v1vibe setup`
+  - **See**: `PYTHON_3.14_SUPPORT.md` for architecture details (2026-04-11)
+
 ### Changed
+
+- **README.md**: Updated uninstall documentation to show all three package managers
+  - Added uninstall instructions for `uv`, `pipx`, and `pip` (previously only showed `uv`)
+  - Updated setup wizard description to mention automatic tmfs CLI installation
+  - Updated system requirements to explicitly mention Python 3.14+ support
+  - Updated `scan_file` tool description to mention CLI fallback compatibility
+  - **Why**: Users may install with pip or pipx, not just uv
+  - **Impact**: Clear uninstall path for all users regardless of installation method (2026-04-11)
 
 - **Malware Scan Instructions**: Strengthened AI assistant guidance for comprehensive file scanning
   - `server.py`: Added concrete `find` command examples instead of vague "find all files" instruction

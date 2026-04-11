@@ -76,9 +76,10 @@ When the user asks for any security review, check, or scan, complete EVERY step:
 **Do NOT skip steps because they seem unlikely to find something. Clean results are valid results.**
 """
 
-from v1vibe.constants import TMAS_BASE_URL, TMAS_VERSION
+from v1vibe.constants import TMAS_BASE_URL, TMAS_VERSION, TMFS_BASE_URL
 
-TMAS_BIN_DIR = CONFIG_DIR / "bin"
+BIN_DIR = CONFIG_DIR / "bin"  # Shared for both TMAS and TMFS
+TMAS_BIN_DIR = BIN_DIR  # Backward compatibility alias
 
 
 def _print(msg: str = "") -> None:
@@ -106,6 +107,38 @@ def _get_platform_info() -> tuple[str, str, str]:
         os_name = "Windows"
         ext = "zip"
     else:  # Linux, Darwin (macOS), and others all use Linux binary
+        os_name = "Linux"
+        ext = "tar.gz"
+
+    # Map architecture
+    if machine in ("arm64", "aarch64", "armv8", "arm"):
+        arch = "arm64"
+    elif machine in ("x86_64", "amd64"):
+        arch = "x86_64"
+    elif machine in ("i386", "i486", "i586", "i686"):
+        arch = "i386"
+    else:
+        arch = machine  # Pass through
+
+    return os_name, arch, ext
+
+
+def _get_tmfs_platform_info() -> tuple[str, str, str]:
+    """Returns (os_name, arch, file_ext) for File Security CLI (tmfs) binary.
+
+    Note: tmfs uses actual OS names (Darwin for macOS) unlike TMAS which uses Linux for all.
+    """
+    system = platform.system()
+    machine = platform.machine().lower()
+
+    # Map OS - tmfs uses real OS names
+    if system == "Windows" or system.startswith(("CYGWIN", "MINGW", "MSYS")):
+        os_name = "Windows"
+        ext = "zip"
+    elif system == "Darwin":
+        os_name = "Darwin"
+        ext = "zip"  # macOS uses zip
+    else:  # Linux and others
         os_name = "Linux"
         ext = "tar.gz"
 
@@ -174,6 +207,79 @@ def _install_tmas() -> str | None:
 
     except Exception as e:
         _print(f"  Error: {e}")
+        return None
+
+
+def _install_tmfs() -> str | None:
+    """Downloads and installs File Security CLI (tmfs). Returns path to binary or None on failure.
+
+    Fallback for Python 3.14+ where grpcio SDK is incompatible.
+    """
+    try:
+        # Get platform info (tmfs uses Darwin for macOS, unlike TMAS)
+        os_name, arch, ext = _get_tmfs_platform_info()
+
+        # Download binary from /latest/ (no version pinning)
+        filename = f"tmfs-cli_{os_name}_{arch}.{ext}"
+        download_url = f"{TMFS_BASE_URL}/latest/{filename}"
+
+        BIN_DIR.mkdir(parents=True, exist_ok=True)
+        archive_path = BIN_DIR / filename
+
+        _print(f"  Downloading File Security CLI (tmfs)...")
+        urllib.request.urlretrieve(download_url, archive_path)
+
+        try:
+            # Extract binary
+            binary_name = "tmfs.exe" if os_name == "Windows" else "tmfs"
+            binary_path = BIN_DIR / binary_name
+
+            if ext == "tar.gz":
+                with tarfile.open(archive_path, "r:gz") as tar:
+                    # Extract just the tmfs binary
+                    for member in tar.getmembers():
+                        if member.name.endswith(binary_name):
+                            member.name = binary_name  # Flatten path
+                            tar.extract(member, BIN_DIR)
+                            break
+            else:  # zip
+                with zipfile.ZipFile(archive_path, "r") as zip_file:
+                    for name in zip_file.namelist():
+                        if name.endswith(binary_name):
+                            # Extract and rename to flatten path
+                            data = zip_file.read(name)
+                            binary_path.write_bytes(data)
+                            break
+
+            # Make executable (Unix-like)
+            if os_name != "Windows":
+                binary_path.chmod(0o755)
+        finally:
+            # Always clean up archive
+            archive_path.unlink(missing_ok=True)
+
+        return str(binary_path)
+
+    except Exception as e:
+        _print(f"  Error: {e}")
+        return None
+
+
+def _get_tmfs_version(tmfs_path: str) -> str | None:
+    """Returns File Security CLI (tmfs) version string or None."""
+    try:
+        result = subprocess.run(
+            [tmfs_path, "--version"], capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            # Parse version from output (example: "tmfs version v1.7.3")
+            output = result.stdout.strip()
+            # Extract version number
+            if "version" in output.lower():
+                return output
+            return f"tmfs {output}"
+        return None
+    except Exception:
         return None
 
 
@@ -480,9 +586,45 @@ def cmd_setup() -> None:
             _print("  Warning: TMAS installation failed. Artifact scanning will be unavailable.")
     _print()
 
+    # Step 4.5: Check File Security SDK compatibility and offer tmfs CLI
+    _print("Step 4.5: Checking File Security SDK compatibility...")
+    tmfs_path = None
+
+    try:
+        from v1vibe.version_check import check_file_security_compatibility
+
+        compatible, results = check_file_security_compatibility()
+
+        if not compatible:
+            # SDK is incompatible - auto-install tmfs CLI
+            _print("  File Security SDK incompatibility detected (Python 3.14+ or grpcio conflict)")
+            _print("  Installing File Security CLI (tmfs) as fallback...")
+            _print()
+
+            tmfs_path = _install_tmfs()
+            if tmfs_path:
+                _print(f"  ✓ Installed: {tmfs_path}")
+                # Verify it works
+                version = _get_tmfs_version(tmfs_path)
+                if version:
+                    _print(f"  ✓ {version}")
+                _print("  ✓ File scanning will use tmfs CLI")
+            else:
+                _print("  ✗ Warning: tmfs installation failed. File scanning may not work.")
+                _print("    You can retry by running 'v1vibe setup' again.")
+        else:
+            _print("  ✓ File Security SDK is compatible")
+            _print("  ✓ File scanning will use File Security SDK (gRPC)")
+
+    except Exception as e:
+        _print(f"  Warning: Could not check File Security SDK: {e}")
+        _print("  Continuing with setup...")
+
+    _print()
+
     # Step 5: Save config
     _print("Step 5: Saving configuration...")
-    save_config_file(api_token, region, tmas_path)
+    save_config_file(api_token, region, tmas_path, tmfs_path)
     _print(f"  Saved to {CONFIG_FILE}")
     _print()
 
@@ -748,6 +890,32 @@ def cmd_status() -> None:
             _print(f"TMAS CLI:    configured but not found ({settings.tmas_binary_path})")
     else:
         _print("TMAS CLI:    not installed (run: v1vibe setup)")
+
+    # File Security SDK version check
+    _print()
+    from v1vibe.version_check import check_file_security_compatibility
+    compatible, results = check_file_security_compatibility()
+    if results:
+        fs_info = results[0]
+        if fs_info.installed:
+            status_icon = "✓" if compatible else "⚠️"
+            _print(f"File Security SDK: {fs_info.installed} {status_icon}")
+            if not compatible:
+                _print("  Warning: Incompatible versions detected (run: v1vibe setup to upgrade)")
+        else:
+            _print("File Security SDK: not installed (optional)")
+
+    # File Security CLI (tmfs) status
+    if settings.tmfs_binary_path:
+        tmfs_exists = Path(settings.tmfs_binary_path).exists()
+        if tmfs_exists:
+            version = _get_tmfs_version(settings.tmfs_binary_path)
+            if version:
+                _print(f"File Security CLI: {version} ✓")
+            else:
+                _print(f"File Security CLI: configured but not working")
+        else:
+            _print(f"File Security CLI: configured but not found ({settings.tmfs_binary_path})")
 
     # MCP client integration (only show if Claude Code is installed)
     _print()

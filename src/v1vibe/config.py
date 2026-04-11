@@ -49,12 +49,14 @@ class Settings:
         region: Vision One region (e.g., "us-east-1", "eu-central-1")
         base_url: Full API base URL derived from region
         tmas_binary_path: Path to TMAS CLI binary, or "docker" for Docker mode
+        tmfs_binary_path: Path to File Security CLI (tmfs) binary for SDK fallback
     """
 
     api_token: str
     region: str
     base_url: str
     tmas_binary_path: str | None = None
+    tmfs_binary_path: str | None = None
 
 
 def load_config_file() -> dict:
@@ -71,7 +73,12 @@ def load_config_file() -> dict:
         return {}
 
 
-def save_config_file(api_token: str, region: str, tmas_binary_path: str | None = None) -> None:
+def save_config_file(
+    api_token: str,
+    region: str,
+    tmas_binary_path: str | None = None,
+    tmfs_binary_path: str | None = None,
+) -> None:
     """Save configuration to ~/.v1vibe/config.json with secure permissions.
 
     The file is created with 0600 permissions (read/write for owner only)
@@ -81,6 +88,7 @@ def save_config_file(api_token: str, region: str, tmas_binary_path: str | None =
         api_token: Vision One API token
         region: Vision One region
         tmas_binary_path: Optional path to TMAS CLI binary
+        tmfs_binary_path: Optional path to File Security CLI (tmfs) binary
 
     Raises:
         RuntimeError: If config file cannot be written
@@ -93,6 +101,8 @@ def save_config_file(api_token: str, region: str, tmas_binary_path: str | None =
         }
         if tmas_binary_path:
             config["tmas_binary_path"] = tmas_binary_path
+        if tmfs_binary_path:
+            config["tmfs_binary_path"] = tmfs_binary_path
 
         CONFIG_FILE.write_text(json.dumps(config, indent=2))
         CONFIG_FILE.chmod(0o600)
@@ -134,10 +144,12 @@ def load_settings() -> Settings:
         raise RuntimeError(f"Unknown region '{region}'. Valid regions: {valid}")
 
     tmas_binary_path = file_config.get("tmas_binary_path")
+    tmfs_binary_path = file_config.get("tmfs_binary_path")
 
     return Settings(
         api_token=api_token,
         region=region,
         base_url=base_url,
         tmas_binary_path=tmas_binary_path,
+        tmfs_binary_path=tmfs_binary_path,
     )

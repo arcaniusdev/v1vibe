@@ -43,8 +43,9 @@ The setup wizard will:
 1. Prompt for your Vision One API token and region
 2. Test connectivity
 3. Install TMAS CLI (TrendAI Artifact Scanner) for dependency/secret/container scanning
-4. Register as an MCP server with Claude Code (if installed)
-5. Configure your AI assistant to use v1vibe automatically
+4. Auto-install File Security CLI (tmfs) if Python 3.14+ or SDK incompatible (fully automatic)
+5. Register as an MCP server with Claude Code (if installed)
+6. Configure your AI assistant to use v1vibe automatically
 
 <details>
 <summary><b>📋 Installation from source</b></summary>
@@ -70,10 +71,11 @@ v1vibe setup
 ## Prerequisites
 
 **System requirements:**
-- Python 3.10 or higher
+- Python 3.10 or higher (including Python 3.14+)
 - One of: `pip`, `uv`, or `pipx` (for installation)
 - Internet connection (for downloading TMAS CLI during setup)
 - **macOS users:** Docker Desktop (for artifact scanning) — setup wizard can install automatically
+- **Python 3.14+ users:** File Security CLI (tmfs) automatically installed if SDK incompatible
 
 **Vision One account:**
 - A [TrendAI Vision One](https://www.trendmicro.com/en_us/business/products/one-platform.html) account
@@ -145,7 +147,7 @@ v1vibe provides **18 security tools** across these categories:
 ### 🦠 Malware & File Security
 | Tool | What it does |
 |------|-------------|
-| `scan_file` | Fast malware scan using File Security SDK (seconds per file, any file type) |
+| `scan_file` | Fast malware scan using File Security SDK or CLI fallback (seconds per file, any file type, Python 3.14+ compatible) |
 | `sandbox_submit_file` | Deep behavioral analysis of files (executables, scripts, documents) |
 | `sandbox_submit_url` | Sandbox analysis for up to 10 URLs |
 | `sandbox_get_status` | Poll sandbox submission status |
@@ -286,8 +288,13 @@ pip install --upgrade --force-reinstall git+https://github.com/arcaniusdev/v1vib
 ## Uninstalling
 
 ```bash
-v1vibe uninstall         # Removes config, TMAS binary, MCP registration, CLAUDE.md instructions
-uv tool uninstall v1vibe # Then remove the Python package
+# Step 1: Remove config, binaries (TMAS CLI, tmfs CLI), MCP registration, CLAUDE.md instructions
+v1vibe uninstall
+
+# Step 2: Remove the Python package (use whichever you installed with)
+uv tool uninstall v1vibe   # If installed with uv
+pipx uninstall v1vibe      # If installed with pipx
+pip uninstall v1vibe       # If installed with pip
 ```
 
 ---

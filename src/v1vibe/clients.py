@@ -15,9 +15,21 @@ from typing import Any
 
 import httpx
 
-import amaas.grpc.aio as amaas_aio
-
 from v1vibe.config import HTTP_TIMEOUT, Settings, load_settings
+
+# Try to import File Security SDK - make it optional for compatibility
+try:
+    import amaas.grpc.aio as amaas_aio
+    FILE_SECURITY_AVAILABLE = True
+except ImportError as e:
+    amaas_aio = None
+    FILE_SECURITY_AVAILABLE = False
+    import warnings
+    warnings.warn(
+        f"File Security SDK not available: {e}. "
+        "File scanning will be disabled. Install with: pip install visionone-filesecurity",
+        ImportWarning
+    )
 
 
 @dataclass
@@ -57,10 +69,17 @@ async def app_lifespan(server: Any) -> AsyncIterator[AppContext]:
     grpc_handle = None
     http = None
     try:
-        grpc_handle = amaas_aio.init_by_region(
-            region=settings.region,
-            api_key=settings.api_token,
-        )
+        # Initialize File Security SDK if available
+        if FILE_SECURITY_AVAILABLE and amaas_aio:
+            try:
+                grpc_handle = amaas_aio.init_by_region(
+                    region=settings.region,
+                    api_key=settings.api_token,
+                )
+            except Exception as e:
+                print(f"v1vibe: warning: File Security initialization failed: {e}", file=sys.stderr)
+                print("v1vibe: File scanning will be disabled. Run 'v1vibe status' for details.", file=sys.stderr)
+
         http = httpx.AsyncClient(
             base_url=settings.base_url,
             headers={"Authorization": f"Bearer {settings.api_token}"},
@@ -76,7 +95,7 @@ async def app_lifespan(server: Any) -> AsyncIterator[AppContext]:
             except Exception:
                 # Don't propagate cleanup errors - just warn
                 print("v1vibe: warning: failed to close HTTP client", file=sys.stderr)
-        if grpc_handle:
+        if grpc_handle and amaas_aio:
             try:
                 await amaas_aio.quit(grpc_handle)
             except Exception:
