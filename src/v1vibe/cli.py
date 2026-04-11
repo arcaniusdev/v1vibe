@@ -822,28 +822,34 @@ def cmd_setup() -> None:
         _print("  See https://github.com/arcaniusdev/v1vibe#other-mcp-clients for details.")
         _print()
 
-    # Offer to add to PATH (Windows only, if v1vibe found but not in PATH)
-    _print("  [DEBUG] PATH check:")
-    _print(f"  [DEBUG]   platform.system() == 'Windows': {platform.system() == 'Windows'}")
-    _print(f"  [DEBUG]   v1vibe_path: {v1vibe_path}")
-    _print(f"  [DEBUG]   shutil.which('v1vibe'): {shutil.which('v1vibe')}")
-    _print(f"  [DEBUG]   not shutil.which('v1vibe'): {not shutil.which('v1vibe')}")
-    _print()
+    # Offer to add to PATH (Windows only, if v1vibe directory not in PATH)
+    if platform.system() == "Windows" and v1vibe_path:
+        # Check if the directory containing v1vibe is in the PATH environment variable
+        v1vibe_dir = str(Path(v1vibe_path).parent)
+        path_env = os.environ.get("PATH", "")
+        path_dirs = [p.lower() for p in path_env.split(";")]
+        v1vibe_dir_lower = v1vibe_dir.lower()
 
-    if platform.system() == "Windows" and v1vibe_path and not shutil.which("v1vibe"):
-        _print("  v1vibe is installed but not in your PATH.")
-        _print("  Adding it to PATH will allow:")
-        _print("    • Running 'v1vibe' from any terminal")
-        _print("    • Better compatibility with other MCP clients")
+        _print("  [DEBUG] PATH check:")
+        _print(f"  [DEBUG]   v1vibe location: {v1vibe_path}")
+        _print(f"  [DEBUG]   v1vibe directory: {v1vibe_dir}")
+        _print(f"  [DEBUG]   Directory in PATH: {v1vibe_dir_lower in path_dirs}")
         _print()
 
-        add_to_path = _input("  Add v1vibe to PATH? [Y/n] ").strip().lower()
-        if add_to_path != "n":
-            v1vibe_dir = str(Path(v1vibe_path).parent)
-            _add_to_path_windows(v1vibe_dir)
-        _print()
-    else:
-        _print("  [DEBUG] Skipping PATH prompt (condition not met)")
+        if v1vibe_dir_lower not in path_dirs:
+            _print("  v1vibe is installed but its directory is not in your PATH.")
+            _print("  Adding it to PATH will allow:")
+            _print("    • Running 'v1vibe' from any terminal")
+            _print("    • Better compatibility with other MCP clients")
+            _print()
+
+            add_to_path = _input("  Add v1vibe to PATH? [Y/n] ").strip().lower()
+            if add_to_path != "n":
+                _add_to_path_windows(v1vibe_dir)
+            _print()
+        else:
+            _print("  [DEBUG] v1vibe directory already in PATH, skipping prompt")
+            _print()
 
     _print("Setup complete! v1vibe is ready to use.")
     _print()
