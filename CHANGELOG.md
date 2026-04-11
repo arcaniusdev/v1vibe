@@ -73,6 +73,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Windows PATH prompt not appearing**: Setup wizard now prompts for PATH regardless of Claude Code detection
+  - `cli.py`: Moved v1vibe discovery logic outside `if claude_path:` block (lines 701-719)
+  - `cli.py`: Moved Windows PATH prompt outside Claude Code registration block (lines 811-823)
+  - **Bug**: PATH logic was conditional on Claude Code being detected; if `shutil.which("claude")` returned None, entire v1vibe discovery and PATH setup was skipped
+  - **Impact**: Users installing on systems without Claude Code pre-installed now get PATH prompts and full path registration
+  - **Why**: Windows doesn't auto-add `.local\bin` to PATH, so v1vibe must be discoverable via explicit PATH addition or full path registration
+  - **Behavior**: PATH prompt now appears for all Windows installations where v1vibe is found but not in PATH, regardless of Claude Code presence (2026-04-11)
+
 #### Phase 1: Critical Resource Management & Security (2026-04-10)
 - **File Handle Management**: Fixed file handles held open during HTTP uploads
   - `sandbox.py`: File contents now read before network request, preventing file locking during slow uploads

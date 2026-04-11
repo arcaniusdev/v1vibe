@@ -697,6 +697,28 @@ def cmd_setup() -> None:
 
     # Step 6: MCP client integration
     _print("Step 6: MCP client integration")
+
+    # First, find v1vibe executable (needed for both Claude Code and manual config)
+    v1vibe_path = shutil.which("v1vibe")
+
+    # If not in PATH, try to find it in common Windows locations
+    if not v1vibe_path and platform.system() == "Windows":
+        # Try Python Scripts directory (pip install)
+        python_dir = Path(sys.executable).parent
+        scripts_dir = python_dir / "Scripts"
+        v1vibe_exe = scripts_dir / "v1vibe.exe"
+
+        if v1vibe_exe.exists():
+            v1vibe_path = str(v1vibe_exe)
+        else:
+            # Try pipx/uv location
+            pipx_bin = Path.home() / ".local" / "bin" / "v1vibe.exe"
+            if pipx_bin.exists():
+                v1vibe_path = str(pipx_bin)
+
+    _print(f"  Found v1vibe at: {v1vibe_path or 'not found'}")
+    _print()
+
     claude_path = shutil.which("claude")
     if claude_path:
         # Claude Code detected - offer automated registration
@@ -710,24 +732,7 @@ def cmd_setup() -> None:
             scope_input = _input("  Choose scope [1]: ").strip()
             scope = "project" if scope_input == "2" else "user"
 
-            # Determine the command to run v1vibe
-            v1vibe_path = shutil.which("v1vibe")
-
-            # If not in PATH, try to find it in common Windows locations
-            if not v1vibe_path and platform.system() == "Windows":
-                # Try Python Scripts directory (pip install)
-                python_dir = Path(sys.executable).parent
-                scripts_dir = python_dir / "Scripts"
-                v1vibe_exe = scripts_dir / "v1vibe.exe"
-
-                if v1vibe_exe.exists():
-                    v1vibe_path = str(v1vibe_exe)
-                else:
-                    # Try pipx location
-                    pipx_bin = Path.home() / ".local" / "bin" / "v1vibe.exe"
-                    if pipx_bin.exists():
-                        v1vibe_path = str(pipx_bin)
-
+            # Use the v1vibe_path we already found at the top of Step 6
             if v1vibe_path:
                 cmd_args = [v1vibe_path]
                 _print(f"  Using: {v1vibe_path}")
@@ -758,20 +763,6 @@ def cmd_setup() -> None:
                 _print(f"  Warning: Could not run claude CLI: {e}")
                 _print(f"  Register manually:")
                 _print(f"    claude mcp add --transport stdio --scope user v1vibe -- {' '.join(cmd_args)}")
-
-            # Offer to add to PATH (Windows only, if v1vibe found but not in PATH)
-            if platform.system() == "Windows" and v1vibe_path and not shutil.which("v1vibe"):
-                _print()
-                _print("  v1vibe is installed but not in your PATH.")
-                _print("  Adding it to PATH will allow:")
-                _print("    • Running 'v1vibe' from any terminal")
-                _print("    • Better compatibility with other MCP clients")
-                _print()
-
-                add_to_path = _input("  Add v1vibe to PATH? [Y/n] ").strip().lower()
-                if add_to_path != "n":
-                    v1vibe_dir = str(Path(v1vibe_path).parent)
-                    _add_to_path_windows(v1vibe_dir)
 
             _print()
 
@@ -815,6 +806,20 @@ def cmd_setup() -> None:
         _print('  }')
         _print()
         _print("  See https://github.com/arcaniusdev/v1vibe#other-mcp-clients for details.")
+        _print()
+
+    # Offer to add to PATH (Windows only, if v1vibe found but not in PATH)
+    if platform.system() == "Windows" and v1vibe_path and not shutil.which("v1vibe"):
+        _print("  v1vibe is installed but not in your PATH.")
+        _print("  Adding it to PATH will allow:")
+        _print("    • Running 'v1vibe' from any terminal")
+        _print("    • Better compatibility with other MCP clients")
+        _print()
+
+        add_to_path = _input("  Add v1vibe to PATH? [Y/n] ").strip().lower()
+        if add_to_path != "n":
+            v1vibe_dir = str(Path(v1vibe_path).parent)
+            _add_to_path_windows(v1vibe_dir)
         _print()
 
     _print("Setup complete! v1vibe is ready to use.")
