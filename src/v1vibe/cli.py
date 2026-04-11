@@ -697,25 +697,39 @@ def cmd_setup() -> None:
 
     # Step 6: MCP client integration
     _print("Step 6: MCP client integration")
+    _print()
+    _print("  [DEBUG] Platform:", platform.system())
+    _print("  [DEBUG] Python executable:", sys.executable)
 
     # First, find v1vibe executable (needed for both Claude Code and manual config)
     v1vibe_path = shutil.which("v1vibe")
+    _print(f"  [DEBUG] shutil.which('v1vibe'): {v1vibe_path or 'None'}")
 
     # If not in PATH, try to find it in common Windows locations
     if not v1vibe_path and platform.system() == "Windows":
+        _print("  [DEBUG] Not in PATH, searching Windows locations...")
+
         # Try Python Scripts directory (pip install)
         python_dir = Path(sys.executable).parent
         scripts_dir = python_dir / "Scripts"
         v1vibe_exe = scripts_dir / "v1vibe.exe"
+        _print(f"  [DEBUG] Checking: {v1vibe_exe}")
+        _print(f"  [DEBUG] Exists: {v1vibe_exe.exists()}")
 
         if v1vibe_exe.exists():
             v1vibe_path = str(v1vibe_exe)
+            _print(f"  [DEBUG] Found in Scripts dir: {v1vibe_path}")
         else:
             # Try pipx/uv location
             pipx_bin = Path.home() / ".local" / "bin" / "v1vibe.exe"
+            _print(f"  [DEBUG] Checking: {pipx_bin}")
+            _print(f"  [DEBUG] Exists: {pipx_bin.exists()}")
+
             if pipx_bin.exists():
                 v1vibe_path = str(pipx_bin)
+                _print(f"  [DEBUG] Found in .local/bin: {v1vibe_path}")
 
+    _print()
     _print(f"  Found v1vibe at: {v1vibe_path or 'not found'}")
     _print()
 
@@ -809,6 +823,13 @@ def cmd_setup() -> None:
         _print()
 
     # Offer to add to PATH (Windows only, if v1vibe found but not in PATH)
+    _print("  [DEBUG] PATH check:")
+    _print(f"  [DEBUG]   platform.system() == 'Windows': {platform.system() == 'Windows'}")
+    _print(f"  [DEBUG]   v1vibe_path: {v1vibe_path}")
+    _print(f"  [DEBUG]   shutil.which('v1vibe'): {shutil.which('v1vibe')}")
+    _print(f"  [DEBUG]   not shutil.which('v1vibe'): {not shutil.which('v1vibe')}")
+    _print()
+
     if platform.system() == "Windows" and v1vibe_path and not shutil.which("v1vibe"):
         _print("  v1vibe is installed but not in your PATH.")
         _print("  Adding it to PATH will allow:")
@@ -821,6 +842,8 @@ def cmd_setup() -> None:
             v1vibe_dir = str(Path(v1vibe_path).parent)
             _add_to_path_windows(v1vibe_dir)
         _print()
+    else:
+        _print("  [DEBUG] Skipping PATH prompt (condition not met)")
 
     _print("Setup complete! v1vibe is ready to use.")
     _print()
