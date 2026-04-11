@@ -698,8 +698,8 @@ def cmd_setup() -> None:
     # Step 6: MCP client integration
     _print("Step 6: MCP client integration")
     _print()
-    _print("  [DEBUG] Platform:", platform.system())
-    _print("  [DEBUG] Python executable:", sys.executable)
+    _print(f"  [DEBUG] Platform: {platform.system()}")
+    _print(f"  [DEBUG] Python executable: {sys.executable}")
 
     # First, find v1vibe executable (needed for both Claude Code and manual config)
     v1vibe_path = shutil.which("v1vibe")
