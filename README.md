@@ -44,8 +44,9 @@ The setup wizard will:
 2. Test connectivity
 3. Install TMAS CLI (TrendAI Artifact Scanner) for dependency/secret/container scanning
 4. Auto-install File Security CLI (tmfs) if Python 3.14+ or SDK incompatible (fully automatic)
-5. Register as an MCP server with Claude Code (if installed)
-6. Configure your AI assistant to use v1vibe automatically
+5. Register as an MCP server with Claude Code (if installed) using full path
+6. **Windows:** Offer to add v1vibe to PATH for better compatibility
+7. Configure your AI assistant to use v1vibe automatically
 
 <details>
 <summary><b>📋 Installation from source</b></summary>

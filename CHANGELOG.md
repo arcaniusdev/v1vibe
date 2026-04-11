@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Windows PATH support**: Setup wizard now offers to add v1vibe to PATH on Windows
+  - `cli.py`: Added `_add_to_path_windows()` to modify user PATH via registry
+  - Detects if v1vibe is installed but not in PATH (e.g., `C:\Users\<user>\.local\bin`)
+  - Prompts user to add to PATH for better compatibility with all MCP clients
+  - Also finds v1vibe in common Windows locations even if not in PATH
+  - **Why**: Windows doesn't auto-add `.local\bin` to PATH, breaking MCP client discovery
+  - **Full path fallback**: MCP registration uses absolute path, works immediately with Claude Code
+  - **Optional PATH**: Adding to PATH enables command-line usage and other MCP clients
+  - **Impact**: Works on Windows without manual PATH configuration (2026-04-11)
+
 - **Python 3.14 Support**: File Security CLI (tmfs) fallback for Python 3.14+ compatibility
   - `file_security.py`: Added `_scan_file_cli()` subprocess wrapper for tmfs binary
   - `file_security.py`: Automatic fallback from SDK → CLI → error with helpful message
