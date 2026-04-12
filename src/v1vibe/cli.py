@@ -478,37 +478,87 @@ async def _test_connectivity(api_token: str, base_url: str) -> dict | None:
         return None
 
 
+def _broadcast_environment_change() -> None:
+    """Broadcast WM_SETTINGCHANGE so new processes pick up PATH without logout.
+
+    Without this, even freshly-launched terminals inherit stale env from any
+    parent that cached it (Explorer, VS Code, Claude Code). We send the message
+    to HWND_BROADCAST with a short timeout so a hung listener can't block us.
+    """
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        HWND_BROADCAST = 0xFFFF
+        WM_SETTINGCHANGE = 0x001A
+        SMTO_ABORTIFHUNG = 0x0002
+
+        SendMessageTimeoutW = ctypes.windll.user32.SendMessageTimeoutW
+        SendMessageTimeoutW.argtypes = [
+            wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPCWSTR,
+            wintypes.UINT, wintypes.UINT, ctypes.POINTER(wintypes.DWORD),
+        ]
+        SendMessageTimeoutW.restype = wintypes.LPARAM
+
+        result = wintypes.DWORD()
+        SendMessageTimeoutW(
+            HWND_BROADCAST, WM_SETTINGCHANGE, 0, "Environment",
+            SMTO_ABORTIFHUNG, 5000, ctypes.byref(result),
+        )
+    except Exception as e:
+        # Non-fatal — registry write already succeeded; just note it.
+        _print(f"  Note: could not broadcast environment change ({e}).")
+        _print("        A logout/login may be required for some apps to see the new PATH.")
+
+
 def _add_to_path_windows(directory: str) -> bool:
     """Add directory to Windows user PATH. Returns True if successful."""
     try:
         import winreg
 
-        # Open user environment variables key
-        key = winreg.OpenKey(
+        # CreateKey opens-or-creates, robust against fresh profiles where
+        # HKCU\Environment may not yet exist.
+        key = winreg.CreateKeyEx(
             winreg.HKEY_CURRENT_USER,
             r"Environment",
             0,
-            winreg.KEY_READ | winreg.KEY_WRITE
+            winreg.KEY_READ | winreg.KEY_WRITE,
         )
 
         try:
-            # Read current PATH
-            current_path, _ = winreg.QueryValueEx(key, "Path")
+            # Read current PATH. May be missing on a pristine user profile.
+            try:
+                current_path, value_type = winreg.QueryValueEx(key, "Path")
+            except FileNotFoundError:
+                current_path, value_type = "", winreg.REG_EXPAND_SZ
 
-            # Check if directory is already in PATH
-            path_entries = current_path.split(";")
-            if directory in path_entries or directory.lower() in [p.lower() for p in path_entries]:
+            # Check if directory is already in PATH (drop empty entries too)
+            path_entries = [p for p in current_path.split(";") if p]
+            if directory.lower() in [p.lower() for p in path_entries]:
                 _print(f"  Already in PATH: {directory}")
                 return True
 
-            # Add to PATH
-            new_path = f"{current_path};{directory}"
-            winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, new_path)
+            # Preserve original value type (REG_SZ vs REG_EXPAND_SZ). If the
+            # new or existing value contains %VAR% references, upgrade to
+            # REG_EXPAND_SZ so they expand correctly.
+            new_path = ";".join([*path_entries, directory])
+            if value_type not in (winreg.REG_SZ, winreg.REG_EXPAND_SZ):
+                value_type = winreg.REG_EXPAND_SZ
+            if "%" in new_path and value_type == winreg.REG_SZ:
+                value_type = winreg.REG_EXPAND_SZ
+
+            winreg.SetValueEx(key, "Path", 0, value_type, new_path)
 
             _print(f"  ✓ Added to PATH: {directory}")
+
+            # Broadcast so new processes see the change without logout.
+            _broadcast_environment_change()
+
             _print()
-            _print("  ⚠️  Important: You need to restart Claude Code (or open a new terminal)")
-            _print("      for the PATH change to take effect.")
+            _print("  ⚠️  Important: apps already running (Claude Code, VS Code, your")
+            _print("      current terminal) cached the old PATH at launch. Fully quit and")
+            _print("      relaunch them — reopening a terminal tab inside the same app is")
+            _print("      not enough.")
             return True
 
         finally:

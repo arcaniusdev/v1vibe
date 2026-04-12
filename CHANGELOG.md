@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Windows PATH update now visible to new processes without logout** (2026-04-11)
+  - `cli.py`: Added `_broadcast_environment_change()` to broadcast `WM_SETTINGCHANGE`
+    after writing the registry, so newly-launched apps pick up the updated PATH
+  - `cli.py`: `_add_to_path_windows()` now uses `CreateKeyEx` (resilient if
+    `HKCU\Environment` doesn't exist on fresh profiles) and handles a missing
+    `Path` value gracefully
+  - `cli.py`: Preserves the original PATH value type (`REG_SZ` vs `REG_EXPAND_SZ`)
+    instead of always overwriting with `REG_EXPAND_SZ`
+  - `cli.py`: Normalizes stray empty entries when rewriting PATH
+  - **Why**: Previously the registry write succeeded but users reported "PATH
+    isn't working" — new terminals inherited stale env from parent processes
+    (VS Code, Claude Code, Explorer) that had cached PATH at launch. Without a
+    `WM_SETTINGCHANGE` broadcast, only logout/reboot fixed it.
+  - Updated post-install message to explain that already-running apps must be
+    fully quit and relaunched, not just have a new terminal tab opened.
+
 ### Added
 
 - **Windows PATH support**: Setup wizard now offers to add v1vibe to PATH on Windows
