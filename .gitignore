@@ -10,9 +10,6 @@ build/
 # API specifications (local development only, contains sensitive endpoints)
 sp-api-open-*.json
 
-# Documentation directory (may contain sensitive examples)
-docs/
-
 # macOS system files
 .DS_Store
 
