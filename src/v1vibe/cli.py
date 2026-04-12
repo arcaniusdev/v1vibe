@@ -572,6 +572,70 @@ def _add_to_path_windows(directory: str) -> bool:
         return False
 
 
+def _find_v1vibe_executable() -> str | None:
+    """Locate an absolute path to the v1vibe executable.
+
+    Search order:
+      1. ``shutil.which("v1vibe")`` — resolved to absolute path.
+      2. uv tool / pipx user-global bin (``~/.local/bin`` on Unix,
+         ``%USERPROFILE%\\.local\\bin`` on Windows).
+      3. Scripts directory alongside the current Python (handles both
+         system-Python layout and venv layout, where ``sys.executable``
+         itself lives inside ``Scripts``).
+
+    Returns an absolute path string if found and existing, else None.
+    Registering a relative path with ``claude mcp add`` breaks MCP
+    launches from other working directories, so this never returns
+    relative paths.
+    """
+    exe_name = "v1vibe.exe" if platform.system() == "Windows" else "v1vibe"
+
+    # 1. PATH lookup
+    found = shutil.which("v1vibe")
+    if found:
+        resolved = Path(found).resolve()
+        if resolved.exists():
+            return str(resolved)
+
+    # 2. uv tool / pipx user-global bin
+    candidates: list[Path] = [Path.home() / ".local" / "bin" / exe_name]
+
+    # 3. Scripts dir alongside current Python — try both layouts:
+    #    system python: <python>/Scripts/v1vibe.exe
+    #    venv:          <venv>/Scripts/python.exe  →  same dir has v1vibe.exe
+    python_dir = Path(sys.executable).parent
+    candidates.append(python_dir / exe_name)
+    candidates.append(python_dir / "Scripts" / exe_name)
+
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        if resolved.exists():
+            return str(resolved)
+
+    return None
+
+
+def _verify_mcp_registration(claude_path: str, name: str = "v1vibe") -> tuple[bool, str]:
+    """Check whether an MCP server is connected after registration.
+
+    Returns (connected, raw_output). Parses ``claude mcp get <name>`` for
+    a "Connected" status line. Used to fail loudly during setup rather
+    than silently registering a broken entry.
+    """
+    try:
+        result = subprocess.run(
+            [claude_path, "mcp", "get", name],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        output = (result.stdout or "") + (result.stderr or "")
+        connected = "Connected" in output and "Failed" not in output
+        return connected, output
+    except Exception as e:
+        return False, f"verification error: {e}"
+
+
 def cmd_setup() -> None:
     _print("v1vibe setup — Vision One MCP Server Configuration")
     _print("=" * 52)
@@ -752,47 +816,11 @@ def cmd_setup() -> None:
     _print(f"  [DEBUG] Python executable: {sys.executable}")
 
     # First, find v1vibe executable (needed for both Claude Code and manual config)
-    v1vibe_path = shutil.which("v1vibe")
-    _print(f"  [DEBUG] shutil.which('v1vibe'): {v1vibe_path or 'None'}")
-
-    # Resolve to absolute path — on Windows, shutil.which() can return a relative
-    # path (e.g. ".\\v1vibe.EXE") when the binary is found via CWD. Registering a
-    # relative path with `claude mcp add` breaks MCP launches from other directories.
-    if v1vibe_path:
-        resolved = Path(v1vibe_path).resolve()
-        if resolved.exists():
-            v1vibe_path = str(resolved)
-            _print(f"  [DEBUG] Resolved to absolute path: {v1vibe_path}")
-        else:
-            _print(f"  [DEBUG] Resolved path does not exist, discarding: {resolved}")
-            v1vibe_path = None
-
-    # If not in PATH, try to find it in common Windows locations
-    if not v1vibe_path and platform.system() == "Windows":
-        _print("  [DEBUG] Not in PATH, searching Windows locations...")
-
-        # Try Python Scripts directory (pip install)
-        python_dir = Path(sys.executable).parent
-        scripts_dir = python_dir / "Scripts"
-        v1vibe_exe = scripts_dir / "v1vibe.exe"
-        _print(f"  [DEBUG] Checking: {v1vibe_exe}")
-        _print(f"  [DEBUG] Exists: {v1vibe_exe.exists()}")
-
-        if v1vibe_exe.exists():
-            v1vibe_path = str(v1vibe_exe)
-            _print(f"  [DEBUG] Found in Scripts dir: {v1vibe_path}")
-        else:
-            # Try pipx/uv location
-            pipx_bin = Path.home() / ".local" / "bin" / "v1vibe.exe"
-            _print(f"  [DEBUG] Checking: {pipx_bin}")
-            _print(f"  [DEBUG] Exists: {pipx_bin.exists()}")
-
-            if pipx_bin.exists():
-                v1vibe_path = str(pipx_bin)
-                _print(f"  [DEBUG] Found in .local/bin: {v1vibe_path}")
-
-    _print()
+    v1vibe_path = _find_v1vibe_executable()
     _print(f"  Found v1vibe at: {v1vibe_path or 'not found'}")
+    if not v1vibe_path:
+        _print("  Tip: install with `uv tool install git+https://github.com/arcaniusdev/v1vibe.git`")
+        _print("       to land v1vibe in a stable, user-global location.")
     _print()
 
     claude_path = shutil.which("claude")
@@ -818,6 +846,15 @@ def cmd_setup() -> None:
                 _print(f"  Using: uvx v1vibe")
 
             try:
+                # Remove any existing v1vibe registration first — `claude mcp add`
+                # refuses to overwrite, so without this a stale entry (e.g. from an
+                # earlier install with a relative path) silently persists.
+                subprocess.run(
+                    [claude_path, "mcp", "remove", "v1vibe", "-s", scope],
+                    capture_output=True,
+                    text=True,
+                )
+
                 result = subprocess.run(
                     [
                         claude_path, "mcp", "add",
@@ -831,6 +868,19 @@ def cmd_setup() -> None:
                 )
                 if result.returncode == 0:
                     _print(f"  Registered v1vibe MCP server (scope: {scope})")
+
+                    # Verify the server actually connects — catches broken
+                    # registrations (stale paths, missing deps) at setup time
+                    # instead of at the user's next Claude Code launch.
+                    connected, output = _verify_mcp_registration(claude_path)
+                    if connected:
+                        _print("  Verified: MCP server connects successfully")
+                    else:
+                        _print("  Warning: registration succeeded but MCP did not connect.")
+                        _print("  `claude mcp get v1vibe` output:")
+                        for line in output.strip().splitlines():
+                            _print(f"    {line}")
+                        _print("  Try running `v1vibe test` to diagnose connectivity.")
                 else:
                     _print(f"  Warning: Registration failed: {result.stderr.strip()}")
                     _print(f"  You can register manually:")

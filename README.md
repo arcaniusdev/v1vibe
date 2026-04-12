@@ -20,14 +20,17 @@ AI coding assistants are powerful, but they can't see security threats in:
 
 ### Installation
 
+`uv tool install` is the canonical install path — it lands `v1vibe` in a
+stable, user-global location (`~/.local/bin` on Unix, `%USERPROFILE%\.local\bin`
+on Windows) that survives project/venv churn and is discoverable on PATH. This
+is what the setup wizard and MCP registration are tuned for.
+
 ```bash
-# With uv (recommended)
+# Canonical (recommended)
 uv tool install git+https://github.com/arcaniusdev/v1vibe.git
 
-# Or with pipx
+# Alternatives (also supported)
 pipx install git+https://github.com/arcaniusdev/v1vibe.git
-
-# Or with pip
 pip install git+https://github.com/arcaniusdev/v1vibe.git
 ```
 
