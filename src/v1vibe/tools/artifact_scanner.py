@@ -263,6 +263,7 @@ async def scan_artifact(
     # Create temp directory for output
     with tempfile.TemporaryDirectory() as tmpdir:
         output_file = Path(tmpdir) / "tmas_scan_report.json"
+        scan_cwd: str | None = None
 
         if use_docker:
             # Docker mode for macOS
@@ -379,7 +380,20 @@ async def scan_artifact(
             env = None  # Docker -e flag handles API key
         else:
             # Binary mode for Linux/Windows
-            cmd = [tmas_path, "scan", artifact_validated]
+            # TMAS requires an explicit source prefix (dir:, registry:, docker:, ...).
+            # _validate_artifact_path strips "dir:" and returns a bare filesystem path,
+            # so re-add it for directory artifacts. Image/archive references already
+            # carry their own prefix and are passed through unchanged.
+            image_prefixes = ("registry:", "docker:", "docker-archive:", "oci-archive:", "oci-dir:", "podman:")
+            if artifact_validated.startswith(image_prefixes):
+                scan_target = artifact_validated
+            else:
+                # Run TMAS from inside the directory and pass "dir:." so the scheme
+                # parser can't misread a Windows drive letter (e.g. "dir:C:\...") as
+                # a second URI scheme.
+                scan_target = "dir:."
+                scan_cwd = artifact_validated
+            cmd = [tmas_path, "scan", scan_target]
 
             # Add scan type flags
             if "vulnerability" in scan_types:
@@ -413,8 +427,12 @@ async def scan_artifact(
                 # Add arguments (no escaping needed since we use list format)
                 cmd.extend(additional_args.split())
 
-            # Set environment variable for API key
-            env = {"TMAS_API_KEY": ctx.settings.api_token}
+            # Set environment variable for API key.
+            # IMPORTANT: merge into os.environ rather than replacing it. On Windows,
+            # a bare env dict strips SystemRoot/PATH/etc., which breaks the Winsock
+            # resolver (getaddrinfoW fails with "non-recoverable ... database lookup")
+            # and prevents TMAS from reaching its update metadata endpoint.
+            env = {**os.environ, "TMAS_API_KEY": ctx.settings.api_token}
 
         try:
             # Run TMAS CLI
@@ -424,6 +442,7 @@ async def scan_artifact(
                 text=True,
                 timeout=SCAN_TIMEOUT,
                 env=env,
+                cwd=scan_cwd if not use_docker else None,
             )
 
             # Read output file if it exists
