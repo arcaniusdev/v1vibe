@@ -755,6 +755,18 @@ def cmd_setup() -> None:
     v1vibe_path = shutil.which("v1vibe")
     _print(f"  [DEBUG] shutil.which('v1vibe'): {v1vibe_path or 'None'}")
 
+    # Resolve to absolute path — on Windows, shutil.which() can return a relative
+    # path (e.g. ".\\v1vibe.EXE") when the binary is found via CWD. Registering a
+    # relative path with `claude mcp add` breaks MCP launches from other directories.
+    if v1vibe_path:
+        resolved = Path(v1vibe_path).resolve()
+        if resolved.exists():
+            v1vibe_path = str(resolved)
+            _print(f"  [DEBUG] Resolved to absolute path: {v1vibe_path}")
+        else:
+            _print(f"  [DEBUG] Resolved path does not exist, discarding: {resolved}")
+            v1vibe_path = None
+
     # If not in PATH, try to find it in common Windows locations
     if not v1vibe_path and platform.system() == "Windows":
         _print("  [DEBUG] Not in PATH, searching Windows locations...")
