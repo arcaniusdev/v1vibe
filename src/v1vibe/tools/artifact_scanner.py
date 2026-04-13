@@ -388,11 +388,13 @@ async def scan_artifact(
             if artifact_validated.startswith(image_prefixes):
                 scan_target = artifact_validated
             else:
-                # Run TMAS from inside the directory and pass "dir:." so the scheme
-                # parser can't misread a Windows drive letter (e.g. "dir:C:\...") as
-                # a second URI scheme.
+                # Filtered copy avoids TMAS secret scanner following symlinks into
+                # .venv (e.g. .venv/bin/python -> /opt/homebrew) and cuts scan noise.
+                filtered_dir = Path(tmpdir) / "filtered_scan"
+                filtered_dir.mkdir()
+                _create_filtered_copy(artifact_validated, str(filtered_dir), set(EXCLUDED_DIRS))
                 scan_target = "dir:."
-                scan_cwd = artifact_validated
+                scan_cwd = str(filtered_dir)
             cmd = [tmas_path, "scan", scan_target]
 
             # Add scan type flags
